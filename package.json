@@ -1,0 +1,20 @@
+{
+  "name": "poc-tn5250-js",
+  "version": "0.0.1-SNAPSHOT",
+  "description": "Proof of concept for a 5250 telnet client in javascript",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/szsascha/poc-tn5250-js.git"
+  },
+  "author": "szsascha",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/szsascha/poc-tn5250-js/issues"
+  },
+  "homepage": "https://github.com/szsascha/poc-tn5250-js#readme"
+}
