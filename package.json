@@ -3,6 +3,7 @@
   "version": "0.0.1-SNAPSHOT",
   "description": "Proof of concept for a 5250 telnet client in javascript",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
