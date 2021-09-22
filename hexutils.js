@@ -12,7 +12,7 @@ class Bytes {
         this.bytes = null;
 
         if (typeof data === 'string') {
-            this.bytes = this.constructor.fromHexString(data);
+            this.bytes = this.constructor.fromHexString(data.toUpperCase());
         } else if (typeof data === 'array') {
             this.bytes = data;
         } else if (typeof data === 'number') {
