@@ -22,6 +22,8 @@ class Protocol {
 // https://datatracker.ietf.org/doc/html/rfc854
 // https://www.ibm.com/docs/en/zos/2.3.0?topic=problems-telnet-commands-options
 // https://datatracker.ietf.org/doc/html/rfc1060
+// https://datatracker.ietf.org/doc/html/rfc1572
+// https://datatracker.ietf.org/doc/html/rfc1408
 export class TelnetMessage extends Protocol {
 
     /**
