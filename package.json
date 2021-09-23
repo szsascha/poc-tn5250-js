@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/szsascha/poc-tn5250-js/issues"
   },
-  "homepage": "https://github.com/szsascha/poc-tn5250-js#readme"
+  "homepage": "https://github.com/szsascha/poc-tn5250-js#readme",
+  "dependencies": {
+    "codepage": "^1.15.0"
+  }
 }
