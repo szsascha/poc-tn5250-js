@@ -1,21 +1,17 @@
-import { TelnetMessage, Tn5250Message } from "./protocol.js";
-import { x } from "./hexutils.js";
+import { TelnetMessage, TelnetMessageProcessor } from "./protocol.js";
 import { Client } from "./networking.js";
-
-
-/*console.log(TelnetMessage.TYPE);
-console.log(Tn5250Message.TERMINAL.IBM31792);
-console.log(Tn5250Message.COMMAND.TEST == 0xff); */
-
-/*console.log(
-    x([0xff, 0xfa]).string
-);
-
-new TelnetMessage();*/
+import { Logger } from './logging.js'
 
 let client = new Client();
 client.connect(23, "pub400.com");
 
+let messageProcessor = new TelnetMessageProcessor();
+
 client.onReceive(function (data) {
-    console.log(data);
+    const message = TelnetMessage.fromSerialized(data);
+    Logger.log('[ RCV ] JSN: ' + JSON.stringify(message));
+
+    let result = messageProcessor.process(message);
+    
+    result.forEach(element => client.write(element.serialize().buffer));
 });

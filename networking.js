@@ -14,17 +14,15 @@ export class Client {
     }
 
     onReceive(callback) {
-        this.socket.on('data', async function (data, callback) {
-            Logger.log("RCV: " + data.toString('hex').toUpperCase());
-            await callback;
+        this.socket.on('data', async function (data) {
+            Logger.log("[ RCV ] HEX: " + data.toString('hex').toUpperCase());
+            await callback(data);
         });
     }
 
     write(data) {
-        Logger.log("SND: " + data.toString('hex').toUpperCase());
-        return new Promise((resolve, reject) => {
-            this.socket.write(data, resolve);
-        });
+        Logger.log("[ SND ] HEX: " + data.toString('hex').toUpperCase());
+        return new Promise((resolve, reject) => this.socket.write(data, resolve));
     }
 
 }

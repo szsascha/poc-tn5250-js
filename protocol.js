@@ -1,20 +1,22 @@
 "use strict";
 
+import { x } from "./hexutils.js";
+import { Logger } from './logging.js'
+
 class Protocol {
 
     constructor() {
         if (new.target === Protocol) {
           throw new TypeError("Cannot construct Protocol instances directly");
         }
-        console.log("hello");
     }
 
     serialize() {
-        console.log("serialize() not implemented");
+        Logger.log("serialize() not implemented");
     }
 
-    deserialize() {
-        console.log("deserialize() not implemented");
+    deserialize(data) {
+        Logger.log("deserialize() not implemented");
     }
 
 }
@@ -24,7 +26,55 @@ class Protocol {
 // https://datatracker.ietf.org/doc/html/rfc1060
 // https://datatracker.ietf.org/doc/html/rfc1572
 // https://datatracker.ietf.org/doc/html/rfc1408
+// https://datatracker.ietf.org/doc/html/rfc2877#page-3
 export class TelnetMessage extends Protocol {
+
+    constructor(command = null, option = null, data = null) {
+        super();
+        this.commands = [];
+        this.chunks = [];
+
+        if (command == null || option == null) return;
+
+        this.commands[0] = [
+            TelnetMessage.COMMAND.IAC_INTERPRET_AS_COMMAND,
+            command,
+            option
+        ]
+
+        if (data == null) return;
+        
+        this.commands[0] = this.commands[0].concat(data.array);
+    }
+
+    serialize() {
+        let serialized = [];
+        this.commands.forEach(bytes => {
+            serialized = serialized.concat(bytes);
+        });
+        return x(serialized);
+    }
+
+    deserialize(data) {
+        let bytes = x(data);
+        this.commands = bytes.getArraySplittedBy(TelnetMessage.COMMAND.IAC_INTERPRET_AS_COMMAND);
+
+        this.commands.forEach(bytes => {
+            if (bytes[0] == TelnetMessage.COMMAND.IAC_INTERPRET_AS_COMMAND) {
+                this.chunks.push(new TelnetMessageChunk(bytes[1], bytes[2], bytes.slice(3)));
+            }
+        });    
+    }
+
+    static create(command = null, option = null, data = null) {
+        return new TelnetMessage(command, option, data);
+    }
+
+    static fromSerialized(data) {
+        let telnetMessage = TelnetMessage.create();
+        telnetMessage.deserialize(data);
+        return telnetMessage;
+    }
 
     /**
      * Return Telnet commands from RFC 854
@@ -123,9 +173,20 @@ export class TelnetMessage extends Protocol {
             REMOTE_FLOW_CONTROL: 0x21,
             LINEMODE: 0x22,
             X_DISPLAY_LOCATION: 0x23,
+            NEW_ENVIRONMENT: 0x27,
             EXTENDED_OPTIONS_LIST: 0xff
         }
     }
+}
+
+class TelnetMessageChunk {
+
+    constructor(command, option, data = []) {
+        this.command = command;
+        this.option = option;
+        this.data = data;
+    }
+
 }
 
 // https://datatracker.ietf.org/doc/html/rfc1205
@@ -144,4 +205,119 @@ export class Tn5250Message extends TelnetMessage {
             IBM525111:  "IBM-5251-11"   // 24 x 80 monochrome display
         } 
     }
+}
+
+class ProtocolProcessor {
+
+    constructor() {
+        if (new.target === Protocol) {
+          throw new TypeError("Cannot construct Protocol instances directly");
+        }
+    }
+
+    process(message) {
+        Logger.log("process() not implemented");
+    }
+
+}
+
+export class TelnetMessageProcessor extends ProtocolProcessor {
+
+    process(message) {
+        let result = [];
+
+        message.chunks.forEach(async (chunk) => {
+            if (chunk.command == TelnetMessage.COMMAND.DO)
+                result.push(this.processDo(chunk));
+    
+            if (chunk.command == TelnetMessage.COMMAND.WILL) 
+                result.push(this.processWill(chunk));
+    
+            if (chunk.command == TelnetMessage.COMMAND.SB_SUBNEGOTIATION) 
+                result.push(this.processSB(chunk));
+        });
+
+        return result;
+    }
+
+    processDo(chunk) {
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
+            Logger.log('[ RCV ] CMD: DO NEW ENVIRONMENT');
+            Logger.log('[ SND ] CMD: WILL NEW ENVIRONMENT');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.WILL,
+                TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT
+            );
+        }
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE) {
+            Logger.log('[ RCV ] CMD: DO TERMINAL TYPE');
+            Logger.log('[ SND ] CMD: WILL TERMINAL TYPE');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.WILL,
+                TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE
+            );
+        }
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.END_OF_RECORD) {
+            Logger.log('[ RCV ] CMD: DO END OF RECORD');
+            Logger.log('[ SND ] CMD: WILL END OF RECORD');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.WILL,
+                TelnetMessage.COMMAND_OPTION.END_OF_RECORD
+            );
+        }
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
+            Logger.log('[ RCV ] CMD: DO BINARY TRANSMISSION');
+            Logger.log('[ SND ] CMD: WILL BINARY TRANSMISSION');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.WILL,
+                TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION
+            );
+        }
+    }
+
+    processWill(chunk) {
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.END_OF_RECORD) {
+            Logger.log('[ RCV ] CMD: WILL END OF RECORD');
+            Logger.log('[ SND ] CMD: DO END OF RECORD');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.DO,
+                TelnetMessage.COMMAND_OPTION.END_OF_RECORD
+            );
+        }
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
+            Logger.log('[ RCV ] CMD: WILL BINARY TRANSMISSION');
+            Logger.log('[ SND ] CMD: DO BINARY TRANSMISSION');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.DO,
+                TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION
+            );
+        }   
+    }
+
+    processSB(chunk) {
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE) {
+            let data = '';
+            if (chunk.data == 0x01) data = ' - SEND YOUR TERMINAL TYPE'
+            Logger.log('[ RCV ] CMD: SB SUBNEGOTIATION TERMINAL TYPE' + data);
+            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + '49424D2D333137392D32');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
+                TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE,
+                x('0049424D2D333137392D32FFF0')
+            );
+            // TODO SUBOPTION END in same request but not in same string as it is now
+            // TODO TERMINAL have to be sent ALWAYS before ENVIRONMENT OPTIONS
+        }
+        if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
+            Logger.log('[ RCV ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + x(chunk.data).string);
+            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + '000349424D52534545440D2DC3EDB3F2E93C00034445564E414D4501034B4244545950450141474503434F44455041474501313134310343484152534554013639350349424D53454E44434F4E4652454301594553');
+            return TelnetMessage.create(
+                TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
+                TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT,
+                x('000349424D52534545440D2DC3EDB3F2E93C00034445564E414D4501034B4244545950450141474503434F44455041474501313134310343484152534554013639350349424D53454E44434F4E4652454301594553FFF0')
+            );
+            // TODO SUBOPTION END in same request but not in same string as it is now
+        }
+    }
+
 }

@@ -34,6 +34,19 @@ class Bytes {
         return array;
     }
 
+    getArraySplittedBy(splitter) {
+        let splitted = [[]];
+        let i = 0;
+        this.array.forEach(byte => {
+            if (splitted[i].length >= 1 && byte == splitter) {
+                i++;
+                splitted[i] = [];
+            }
+            splitted[i].push(byte)
+        });
+        return splitted;
+    }
+
     get array() {
         return this.bytes;
     }
