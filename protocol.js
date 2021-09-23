@@ -210,7 +210,7 @@ export class Tn5250Message extends TelnetMessage {
 class ProtocolProcessor {
 
     constructor() {
-        if (new.target === Protocol) {
+        if (new.target === ProtocolProcessor) {
           throw new TypeError("Cannot construct Protocol instances directly");
         }
     }
@@ -226,52 +226,66 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
     process(message) {
         let result = [];
 
-        message.chunks.forEach(async (chunk) => {
+        message.chunks.forEach(async chunk => {
             if (chunk.command == TelnetMessage.COMMAND.DO)
-                result.push(this.processDo(chunk));
+                result.push(
+                    this.processResultArrayToTelnetMessage(this.processDo(chunk))
+                );
     
             if (chunk.command == TelnetMessage.COMMAND.WILL) 
-                result.push(this.processWill(chunk));
+                result.push(
+                    this.processResultArrayToTelnetMessage(this.processWill(chunk))
+                );
     
             if (chunk.command == TelnetMessage.COMMAND.SB_SUBNEGOTIATION) 
-                result.push(this.processSB(chunk));
+                result.push(
+                    this.processResultArrayToTelnetMessage(this.processSB(chunk))
+                );
         });
 
         return result;
+    }
+
+    processResultArrayToTelnetMessage(array) {
+        return TelnetMessage.create(
+            array[0], 
+            array.length > 1 ? array[1] : null, 
+            array.length > 2 ? array[2] : null
+        );
     }
 
     processDo(chunk) {
         if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
             Logger.log('[ RCV ] CMD: DO NEW ENVIRONMENT');
             Logger.log('[ SND ] CMD: WILL NEW ENVIRONMENT');
-            return TelnetMessage.create(
+            return [ 
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT
-            );
+            ];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE) {
             Logger.log('[ RCV ] CMD: DO TERMINAL TYPE');
             Logger.log('[ SND ] CMD: WILL TERMINAL TYPE');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE
-            );
+            ];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.END_OF_RECORD) {
             Logger.log('[ RCV ] CMD: DO END OF RECORD');
             Logger.log('[ SND ] CMD: WILL END OF RECORD');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.END_OF_RECORD
-            );
+            ];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
             Logger.log('[ RCV ] CMD: DO BINARY TRANSMISSION');
             Logger.log('[ SND ] CMD: WILL BINARY TRANSMISSION');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION
-            );
+            ];
         }
     }
 
@@ -279,18 +293,18 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
         if (chunk.option == TelnetMessage.COMMAND_OPTION.END_OF_RECORD) {
             Logger.log('[ RCV ] CMD: WILL END OF RECORD');
             Logger.log('[ SND ] CMD: DO END OF RECORD');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.DO,
                 TelnetMessage.COMMAND_OPTION.END_OF_RECORD
-            );
+            ];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
             Logger.log('[ RCV ] CMD: WILL BINARY TRANSMISSION');
             Logger.log('[ SND ] CMD: DO BINARY TRANSMISSION');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.DO,
                 TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION
-            );
+            ];
         }   
     }
 
@@ -300,22 +314,22 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
             if (chunk.data == 0x01) data = ' - SEND YOUR TERMINAL TYPE'
             Logger.log('[ RCV ] CMD: SB SUBNEGOTIATION TERMINAL TYPE' + data);
             Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + '49424D2D333137392D32');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
                 TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE,
                 x('0049424D2D333137392D32FFF0')
-            );
+            ];
             // TODO SUBOPTION END in same request but not in same string as it is now
             // TODO TERMINAL have to be sent ALWAYS before ENVIRONMENT OPTIONS
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
             Logger.log('[ RCV ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + x(chunk.data).string);
             Logger.log('[ SND ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + '000349424D52534545440D2DC3EDB3F2E93C00034445564E414D4501034B4244545950450141474503434F44455041474501313134310343484152534554013639350349424D53454E44434F4E4652454301594553');
-            return TelnetMessage.create(
+            return [
                 TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
                 TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT,
                 x('000349424D52534545440D2DC3EDB3F2E93C00034445564E414D4501034B4244545950450141474503434F44455041474501313134310343484152534554013639350349424D53454E44434F4E4652454301594553FFF0')
-            );
+            ];
             // TODO SUBOPTION END in same request but not in same string as it is now
         }
     }
