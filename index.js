@@ -1,4 +1,5 @@
-import { TelnetMessage, TelnetMessageProcessor } from "./protocol.js";
+import { TelnetMessage } from "./protocol.js";
+import { TelnetMessageProcessor } from "./protocolprocessor.js";
 import { Client } from "./networking.js";
 import { Logger } from './logging.js'
 
