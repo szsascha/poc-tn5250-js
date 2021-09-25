@@ -24,65 +24,74 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
         let result = [];
 
         message.chunks.forEach(async chunk => {
-            if (chunk.command == TelnetMessage.COMMAND.DO)
-                result.push(
+            if (chunk.command == TelnetMessage.COMMAND.DO) {
+                result = result.concat(
                     this.processResultArrayToTelnetMessage(this.processDo(chunk))
                 );
+            }
     
-            if (chunk.command == TelnetMessage.COMMAND.WILL) 
-                result.push(
+            if (chunk.command == TelnetMessage.COMMAND.WILL) {
+                result = result.concat(
                     this.processResultArrayToTelnetMessage(this.processWill(chunk))
                 );
+            }
     
-            if (chunk.command == TelnetMessage.COMMAND.SB_SUBNEGOTIATION) 
-                result.push(
+            if (chunk.command == TelnetMessage.COMMAND.SB_SUBNEGOTIATION) {
+                result = result.concat(
                     this.processResultArrayToTelnetMessage(this.processSB(chunk))
                 );
+            }
         });
 
         return result;
     }
 
     processResultArrayToTelnetMessage(array) {
-        return TelnetMessage.create(
-            array[0], 
-            array.length > 1 ? array[1] : null, 
-            array.length > 2 ? array[2] : null
-        );
+        const telnetMessageArgArray = [];
+        
+        array.forEach(messageArray => {
+            let telnetMessageArg = [ messageArray[0] ];
+            if (messageArray.length > 1) telnetMessageArg = telnetMessageArg.concat(messageArray[1]);
+            if (messageArray.length > 2) telnetMessageArg = telnetMessageArg.concat(messageArray[2]);
+
+            telnetMessageArgArray.push(telnetMessageArg);
+        });
+
+        return [ TelnetMessage.create(telnetMessageArgArray) ];        
     }
 
     processDo(chunk) {
         if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
             Logger.log('[ RCV ] CMD: DO NEW ENVIRONMENT');
             Logger.log('[ SND ] CMD: WILL NEW ENVIRONMENT');
-            return [ 
+            return [[ 
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT
-            ];
+            ]];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE) {
             Logger.log('[ RCV ] CMD: DO TERMINAL TYPE');
             Logger.log('[ SND ] CMD: WILL TERMINAL TYPE');
-            return [
+            return [[
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE
-            ];
+            ]];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.END_OF_RECORD) {
             Logger.log('[ RCV ] CMD: DO END OF RECORD');
             Logger.log('[ SND ] CMD: WILL END OF RECORD');
-            return [
+            return [[
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.END_OF_RECORD
-            ];
+            ]];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
             Logger.log('[ RCV ] CMD: DO BINARY TRANSMISSION');
             Logger.log('[ SND ] CMD: WILL BINARY TRANSMISSION');
-            return [
+            return [[
                 TelnetMessage.COMMAND.WILL,
                 TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION
-            ];
+            ]];
         }
     }
 
@@ -90,18 +99,18 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
         if (chunk.option == TelnetMessage.COMMAND_OPTION.END_OF_RECORD) {
             Logger.log('[ RCV ] CMD: WILL END OF RECORD');
             Logger.log('[ SND ] CMD: DO END OF RECORD');
-            return [
+            return [[
                 TelnetMessage.COMMAND.DO,
                 TelnetMessage.COMMAND_OPTION.END_OF_RECORD
-            ];
+            ]];
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
             Logger.log('[ RCV ] CMD: WILL BINARY TRANSMISSION');
             Logger.log('[ SND ] CMD: DO BINARY TRANSMISSION');
-            return [
+            return [[
                 TelnetMessage.COMMAND.DO,
                 TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION
-            ];
+            ]];
         }   
     }
 
@@ -115,14 +124,16 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
             outputChunkObject.command = TelnetMessageChunkObject.COMMAND.IS;
             outputChunkObject.terminalType = Tn5250Message.TERMINAL.IBM31792;
 
-            const outputBytes = outputChunkObject.data.concat(x('FF00').array);
+            //const outputBytes = outputChunkObject.data.concat(x('FFF0').array);
 
-            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + x(outputBytes).string);
-            return [
+            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + x(outputChunkObject.data).string);
+            return [[
                 TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
                 TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE,
-                outputBytes
-            ];
+                outputChunkObject.data
+            ], [
+                TelnetMessage.COMMAND.SE_END_OF_SUBNEGOTIATION_PARAMETERS
+            ]];
             // TODO SUBOPTION END in same request but not in same string as it is now
             // TODO TERMINAL have to be sent ALWAYS before ENVIRONMENT OPTIONS
         }
@@ -165,14 +176,16 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
                 TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMSENDCONFREC,
                 'YES'
             );
-            outputChunkObject.data = outputChunkObject.data.concat(x('FF00').array);
+            // outputChunkObject.data = outputChunkObject.data.concat(x('FFF0').array);
 
             Logger.log('[ SND ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + x(outputChunkObject.data).string);
-            return [
+            return [[
                 TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
                 TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT,
                 outputChunkObject.data
-            ];
+            ], [
+                TelnetMessage.COMMAND.SE_END_OF_SUBNEGOTIATION_PARAMETERS
+            ]];
             // TODO SUBOPTION END in same request but not in same string as it is now
         }
     }

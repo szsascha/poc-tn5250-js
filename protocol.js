@@ -30,7 +30,29 @@ class Protocol {
 // https://datatracker.ietf.org/doc/html/rfc4777
 export class TelnetMessage extends Protocol {
 
-    constructor(command = null, option = null, data = null) {
+    constructor(commands = []) {
+        super();
+        this.commands = [];
+        this.chunks = [];
+
+        commands.forEach(command => {
+            const slicedCommand = command.slice(0, 2);
+            const slicedCommandArg = command.slice(2);
+            let commandArray = [ TelnetMessage.COMMAND.IAC_INTERPRET_AS_COMMAND ].concat(slicedCommand);
+
+            if (command.length > 2) {
+                if (!Array.isArray(slicedCommandArg)) {
+                    commandArray = commandArray.concat(slicedCommandArg[0].array);
+                } else {
+                    commandArray = commandArray.concat(slicedCommandArg);
+                }
+            }
+
+            this.commands.push(commandArray);
+        });
+    }
+
+    /*constructor(command = null, option = null, data = null) {
         super();
         this.commands = [];
         this.chunks = [];
@@ -49,7 +71,7 @@ export class TelnetMessage extends Protocol {
         } else {
             this.commands[0] = this.commands[0].concat(data);
         }
-    }
+    }*/
 
     serialize() {
         let serialized = [];
@@ -70,8 +92,8 @@ export class TelnetMessage extends Protocol {
         });    
     }
 
-    static create(command = null, option = null, data = null) {
-        return new TelnetMessage(command, option, data);
+    static create(commands = []) {
+        return new TelnetMessage(commands);
     }
 
     static fromSerialized(data) {
