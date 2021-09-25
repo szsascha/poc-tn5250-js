@@ -6,6 +6,18 @@ export function x(data) {
     return new Bytes(data);
 }
 
+export function bytesFromString(string, encoding = 'utf8') {
+    let bytebuffer = [];
+    const buffer = Buffer.from(string, encoding);
+    for (let i = 0; i < buffer.length; i++) {
+        bytebuffer.push(buffer[i]);
+    }
+    
+    const bytes = new Bytes([...bytebuffer]);
+
+    return bytes;
+}
+
 class Bytes {
 
     constructor(data) {

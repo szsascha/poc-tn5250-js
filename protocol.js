@@ -1,6 +1,6 @@
 "use strict";
 
-import { x } from "./hexutils.js";
+import { x, bytesFromString } from "./hexutils.js";
 import { Logger } from './logging.js'
 
 class Protocol {
@@ -27,6 +27,7 @@ class Protocol {
 // https://datatracker.ietf.org/doc/html/rfc1572
 // https://datatracker.ietf.org/doc/html/rfc1408
 // https://datatracker.ietf.org/doc/html/rfc2877#page-3
+// https://datatracker.ietf.org/doc/html/rfc4777
 export class TelnetMessage extends Protocol {
 
     constructor(command = null, option = null, data = null) {
@@ -43,8 +44,11 @@ export class TelnetMessage extends Protocol {
         ]
 
         if (data == null) return;
-        
-        this.commands[0] = this.commands[0].concat(data.array);
+        if (!Array.isArray(data)) {
+            this.commands[0] = this.commands[0].concat(data.array);
+        } else {
+            this.commands[0] = this.commands[0].concat(data);
+        }
     }
 
     serialize() {
@@ -181,10 +185,159 @@ export class TelnetMessage extends Protocol {
 
 class TelnetMessageChunk {
 
-    constructor(command, option, data = []) {
+    constructor(command, option, data = null) {
         this.command = command;
         this.option = option;
         this.data = data;
+        this.object = createTelnetMessageChunkObject(command, option, data);
+    }
+
+}
+
+function createTelnetMessageChunkObject(command, option, data) {
+    if (command == TelnetMessage.COMMAND.SB_SUBNEGOTIATION
+        && option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
+        return new TelnetMessageChunkObjectNewEnvironment(data);
+    }
+    if (command == TelnetMessage.COMMAND.SB_SUBNEGOTIATION
+        && option == TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE) {
+        return new TelnetMessageChunkObjectTerminalType(data);
+    }
+    return null;
+}
+
+class TelnetMessageChunkObject {
+
+    constructor(data) {
+        this.data = data;
+        if (data == null) this.data = [];
+        if (new.target === TelnetMessageChunkObject) {
+          throw new TypeError("Cannot construct TelnetMessageChunkObject instances directly");
+        }
+    }
+
+    static get COMMAND() {
+        return {
+            IS: 0x00,
+            SEND: 0x01,
+            INFO: 0x02
+        }
+    }
+}
+
+class TelnetMessageChunkObjectNewEnvironment extends TelnetMessageChunkObject {
+    
+    constructor(data = null) {
+        super(data);
+        this.openSendSection = false;
+    }
+
+    pushIs(code, key, value = null) {
+        // Close send section if open
+        if (this.openSendSection) this.openSendSection = false;
+
+        let keyvalue = bytesFromString(key, 'ascii').array;
+        if (value != null) {
+            if (key != TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMRSEED) keyvalue += TelnetMessageChunkObjectNewEnvironment.CODE.VALUE;
+            if (typeof value === 'string') {
+                keyvalue = keyvalue.concat(bytesFromString(value, 'ascii').array);
+            } else {
+                keyvalue = keyvalue.concat(value);
+            }
+        }
+        this.data.push(
+            TelnetMessageChunkObject.COMMAND.IS,
+            code
+        );
+
+        if (Array.isArray(keyvalue)) {
+            this.data = this.data.concat(keyvalue);
+        } else {
+            if (keyvalue != null) this.data.push(keyvalue);
+        }
+    }
+
+    pushSend(code, key, value) {
+        if(!this.openSendSection) {
+            this.openSendSection = true;
+            this.data.push(TelnetMessageChunkObject.COMMAND.SEND);
+        }
+
+        if (typeof value === 'string') {
+            value = bytesFromString(value, 'ascii').array;
+        }
+
+        this.data = this.data.concat(code);
+
+        this.data = this.data.concat(bytesFromString(key, 'ascii').array);
+
+        this.data = this.data.concat(TelnetMessageChunkObjectNewEnvironment.CODE.VALUE);
+
+        if (Array.isArray(value)) {
+            this.data = this.data.concat(value);
+        } else {
+            if (value != null) this.data.push(value);
+        }
+    }
+
+    getSend(code, key) {
+        // Currently only IBMRSEED is needed
+        if (code != TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR) return null;
+
+        if (this.data[0] == TelnetMessageChunkObject.COMMAND.SEND
+            && this.data[1] == TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR) {
+                const uservarValue = this.data.slice(10);
+                return uservarValue.slice(0, 8);
+        }
+    }
+
+    static get CODE() {
+        return {
+            VAR: 0x00,
+            VALUE: 0x01,
+            ESC: 0x02,
+            USERVAR: 0x03
+        };
+    }
+
+    static get USERVAR() {
+        return {
+            USER: "USER",
+            IBMRSEED: "IBMRSEED",
+            IBMSUBSPW: "IBMSUBSPW",
+            IBMCURLIB: "IBMCURLIB",
+            IBMIMENU: "IBMIMENU",
+            IBMPROGRAM: "IBMPROGAM",
+            DEVNAME: "DEVNAME",
+            KBDTYPE: "KBDTYPE",
+            CODEPAGE: "CODEPAGE",
+            CHARSET: "CHARSET",
+            IBMSENDCONFREC: "IBMSENDCONFREC",
+            IBMASSOCPRT: "IBMASSOCPRT"
+        };
+    }
+}
+
+class TelnetMessageChunkObjectTerminalType extends TelnetMessageChunkObject {
+
+    constructor(data = null) {
+        super(data);
+        this.command = null;
+        this.terminalType = null;
+        if (data != null && data.length > 0) { 
+            this.command = data[0];
+        }
+    }
+
+    get data() {
+        this._data = [];
+        if (this.command != null) this._data[0] = this.command;
+        if (this.terminalType != null) this._data = this._data.concat(bytesFromString(this.terminalType, 'ascii').array);
+        return this._data;
+    }
+
+    set data(data) {
+        this._data = data;
     }
 
 }
@@ -211,7 +364,7 @@ class ProtocolProcessor {
 
     constructor() {
         if (new.target === ProtocolProcessor) {
-          throw new TypeError("Cannot construct Protocol instances directly");
+          throw new TypeError("Cannot construct ProtocolProcessor instances directly");
         }
     }
 
@@ -311,24 +464,70 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
     processSB(chunk) {
         if (chunk.option == TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE) {
             let data = '';
-            if (chunk.data == 0x01) data = ' - SEND YOUR TERMINAL TYPE'
+            if (chunk.object.command == TelnetMessageChunkObject.COMMAND.SEND) data = ' - SEND YOUR TERMINAL TYPE'
             Logger.log('[ RCV ] CMD: SB SUBNEGOTIATION TERMINAL TYPE' + data);
-            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + '49424D2D333137392D32');
+
+            const outputChunkObject = createTelnetMessageChunkObject(TelnetMessage.COMMAND.SB_SUBNEGOTIATION, TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE);
+            outputChunkObject.command = TelnetMessageChunkObject.COMMAND.IS;
+            outputChunkObject.terminalType = Tn5250Message.TERMINAL.IBM31792;
+
+            const outputBytes = outputChunkObject.data.concat(x('FF00').array);
+
+            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + x(outputBytes).string);
             return [
                 TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
                 TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE,
-                x('0049424D2D333137392D32FFF0')
+                outputBytes
             ];
             // TODO SUBOPTION END in same request but not in same string as it is now
             // TODO TERMINAL have to be sent ALWAYS before ENVIRONMENT OPTIONS
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
             Logger.log('[ RCV ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + x(chunk.data).string);
-            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + '000349424D52534545440D2DC3EDB3F2E93C00034445564E414D4501034B4244545950450141474503434F44455041474501313134310343484152534554013639350349424D53454E44434F4E4652454301594553');
+
+            const inputChunkObject = chunk.object.getSend(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR, 
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMRSEED
+            );
+            if (inputChunkObject != null) Logger.log('==========> ' + x(inputChunkObject).string);
+
+            const outputChunkObject = createTelnetMessageChunkObject(TelnetMessage.COMMAND.SB_SUBNEGOTIATION, TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT);
+            outputChunkObject.pushIs(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMRSEED,
+                x('0D2DC3EDB3F2E93C').array // TODO: Generate
+            );
+            outputChunkObject.pushIs(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.DEVNAME
+            );
+            outputChunkObject.pushSend(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.KBDTYPE,
+                'AGE'
+            );
+            outputChunkObject.pushSend(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.CODEPAGE,
+                '1141'
+            );
+            outputChunkObject.pushSend(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.CHARSET,
+                '695'
+            );
+            outputChunkObject.pushSend(
+                TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
+                TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMSENDCONFREC,
+                'YES'
+            );
+            outputChunkObject.data = outputChunkObject.data.concat(x('FF00').array);
+
+            Logger.log('[ SND ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + x(outputChunkObject.data).string);
             return [
                 TelnetMessage.COMMAND.SB_SUBNEGOTIATION,
                 TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT,
-                x('000349424D52534545440D2DC3EDB3F2E93C00034445564E414D4501034B4244545950450141474503434F44455041474501313134310343484152534554013639350349424D53454E44434F4E4652454301594553FFF0')
+                outputChunkObject.data
             ];
             // TODO SUBOPTION END in same request but not in same string as it is now
         }
