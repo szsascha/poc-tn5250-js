@@ -3,10 +3,16 @@
 import { Client } from "./networking.js";
 import { TelnetMessageProcessor } from "./protocolprocessor.js";
 
+export const SessionState = {
+    INIT: 'init',
+    NEGOTIATION: 'negotiation',
+    ACTIVE: 'active'
+};
+
 class SessionSingleton {
     
     constructor() {
-        this.state = SessionSingleton.STATE.INIT;
+        this.state = SessionState.INIT;
         this.config = new SessionConfiguration();
         this.messageProcessor = new TelnetMessageProcessor();
         this.client = new Client();
@@ -15,18 +21,11 @@ class SessionSingleton {
     start() {
         this.client.connect(this.config.port, this.config.host);
 
+        this.state = SessionState.NEGOTIATION;
         this.client.onReceive(data => {      
             const result = this.messageProcessor.process(data);
             result.forEach(element => this.client.write(element.serialize().buffer));
         });
-    }
-
-    static get STATE() {
-        return {
-            INIT: 'init',
-            NEGOTIATION: 'negotiation',
-            ACTIVE: 'active'
-        };
     }
 
 }

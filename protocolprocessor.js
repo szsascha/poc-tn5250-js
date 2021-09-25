@@ -3,6 +3,7 @@
 import { TelnetMessage, TelnetMessageChunkObjectNewEnvironment, TelnetMessageChunkObject, createTelnetMessageChunkObject, Tn5250Message } from "./protocol.js";
 import { Logger } from './logging.js'
 import { x } from "./hexutils.js";
+import { Session, SessionState } from './session.js'
 
 class ProtocolProcessor {
 
@@ -109,6 +110,11 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.BINARY_TRANSMISSION) {
             Logger.log('[ RCV ] CMD: WILL BINARY TRANSMISSION');
+
+            // Switch to 5250 mode
+            Session.messageProcessor = new Tn5250Processor();
+            Session.state = SessionState.ACTIVE;
+
             Logger.log('[ SND ] CMD: DO BINARY TRANSMISSION');
             return [[
                 TelnetMessage.COMMAND.DO,
@@ -190,6 +196,19 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
 
     static generateRandomSeed() {
         return x([...Array(16)].map(() => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()).array;
+    }
+
+}
+
+export class Tn5250Processor extends ProtocolProcessor {
+
+    constructor() {
+        super();
+    }
+
+    process(data) {
+        Logger.log("process() not implemented");
+        return [];
     }
 
 }
