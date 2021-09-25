@@ -12,7 +12,7 @@ class ProtocolProcessor {
         }
     }
 
-    process(message) {
+    process(data) {
         Logger.log("process() not implemented");
     }
 
@@ -20,7 +20,10 @@ class ProtocolProcessor {
 
 export class TelnetMessageProcessor extends ProtocolProcessor {
 
-    process(message) {
+    process(data) {
+        const message = TelnetMessage.fromSerialized(data);
+        Logger.log('[ RCV ] JSN: ' + JSON.stringify(message));
+
         let result = [];
 
         message.chunks.forEach(async chunk => {
@@ -141,7 +144,6 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
                 TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR, 
                 TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMRSEED
             );
-            if (inputChunkObject != null) Logger.log('==========> ' + x(inputChunkObject).string);
 
             const outputChunkObject = createTelnetMessageChunkObject(TelnetMessage.COMMAND.SB_SUBNEGOTIATION, TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT);
             outputChunkObject.pushIs(
