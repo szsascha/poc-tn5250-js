@@ -122,9 +122,7 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
 
             const outputChunkObject = createTelnetMessageChunkObject(TelnetMessage.COMMAND.SB_SUBNEGOTIATION, TelnetMessage.COMMAND_OPTION.TERMINAL_TYPE);
             outputChunkObject.command = TelnetMessageChunkObject.COMMAND.IS;
-            outputChunkObject.terminalType = Tn5250Message.TERMINAL.IBM31792;
-
-            //const outputBytes = outputChunkObject.data.concat(x('FFF0').array);
+            outputChunkObject.terminalType = Tn5250Message.TERMINAL.IBM31792;;
 
             Logger.log('[ SND ] CMD: SB SUBNEGOTIATION TERMINAL TYPE - HERE IS MY TERMINAL TYPE ' + x(outputChunkObject.data).string);
             return [[
@@ -134,7 +132,6 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
             ], [
                 TelnetMessage.COMMAND.SE_END_OF_SUBNEGOTIATION_PARAMETERS
             ]];
-            // TODO SUBOPTION END in same request but not in same string as it is now
             // TODO TERMINAL have to be sent ALWAYS before ENVIRONMENT OPTIONS
         }
         if (chunk.option == TelnetMessage.COMMAND_OPTION.NEW_ENVIRONMENT) {
@@ -176,7 +173,6 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
                 TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMSENDCONFREC,
                 'YES'
             );
-            // outputChunkObject.data = outputChunkObject.data.concat(x('FFF0').array);
 
             Logger.log('[ SND ] CMD: SB SUBNEGOTIATION NEW ENVIRONMENT ' + x(outputChunkObject.data).string);
             return [[
@@ -186,7 +182,6 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
             ], [
                 TelnetMessage.COMMAND.SE_END_OF_SUBNEGOTIATION_PARAMETERS
             ]];
-            // TODO SUBOPTION END in same request but not in same string as it is now
         }
 
     }
