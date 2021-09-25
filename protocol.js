@@ -52,27 +52,6 @@ export class TelnetMessage extends Protocol {
         });
     }
 
-    /*constructor(command = null, option = null, data = null) {
-        super();
-        this.commands = [];
-        this.chunks = [];
-
-        if (command == null || option == null) return;
-
-        this.commands[0] = [
-            TelnetMessage.COMMAND.IAC_INTERPRET_AS_COMMAND,
-            command,
-            option
-        ]
-
-        if (data == null) return;
-        if (!Array.isArray(data)) {
-            this.commands[0] = this.commands[0].concat(data.array);
-        } else {
-            this.commands[0] = this.commands[0].concat(data);
-        }
-    }*/
-
     serialize() {
         let serialized = [];
         this.commands.forEach(bytes => {
