@@ -150,7 +150,7 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
             outputChunkObject.pushIs(
                 TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
                 TelnetMessageChunkObjectNewEnvironment.USERVAR.IBMRSEED,
-                x('0D2DC3EDB3F2E93C').array // TODO: Generate
+                TelnetMessageProcessor.generateRandomSeed()
             );
             outputChunkObject.pushIs(
                 TelnetMessageChunkObjectNewEnvironment.CODE.USERVAR,
@@ -188,6 +188,11 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
             ]];
             // TODO SUBOPTION END in same request but not in same string as it is now
         }
+
+    }
+
+    static generateRandomSeed() {
+        return x([...Array(16)].map(() => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()).array;
     }
 
 }
