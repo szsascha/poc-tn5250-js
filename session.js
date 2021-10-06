@@ -9,6 +9,8 @@ export const SessionState = {
     ACTIVE: 'active'
 };
 
+// TODO: Terminal, Codepage, etc. in Session config
+
 class SessionSingleton {
     
     constructor() {

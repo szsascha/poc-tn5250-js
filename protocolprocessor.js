@@ -207,7 +207,9 @@ export class Tn5250Processor extends ProtocolProcessor {
     }
 
     process(data) {
-        Logger.log("process() not implemented");
+        const message = Tn5250Message.fromSerialized(data);
+        Logger.log('[ RCV ] JSN: ' + JSON.stringify(message));
+
         return [];
     }
 

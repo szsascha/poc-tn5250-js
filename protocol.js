@@ -1,7 +1,8 @@
 "use strict";
 
 import { x, bytesFromString } from "./hexutils.js";
-import { Logger } from './logging.js'
+import { Logger } from './logging.js';
+import { Codepage } from './codepage.js';
 
 class Protocol {
 
@@ -344,7 +345,122 @@ export class TelnetMessageChunkObjectTerminalType extends TelnetMessageChunkObje
 }
 
 // https://datatracker.ietf.org/doc/html/rfc1205
-export class Tn5250Message extends TelnetMessage {
+// http://bitsavers.informatik.uni-stuttgart.de/pdf/ibm/5250_5251/GA21-9247-2_5250_Information_Display_System_Functions_Reference_Manual_May80.pdf
+// https://www.ibm.com/docs/en/i/7.2?topic=ssw_ibm_i_72/apis/dsm1f.htm
+export class Tn5250Message extends Protocol {
+
+    constructor() {
+        super();
+        this.logicalRecordLength = 0;
+        this.recordType = null;
+        this.variableHeaderLength = 0;
+        this.flags = {
+            ERR_DATA_STREAM_OUTPUT_ERROR: false,
+            ATN_ATTENTION_KEY_PRESSED: false,
+            SRQ_SYSTEM_REQUEST_KEY_PRESSED: false,
+            TRQ_TEST_REQUEST_KEY_PRESSED: false,
+            HLP_HELP_IN_ERROR_STATE: false
+        };
+        this.opcode = 0x00;
+
+        // Printer startup response record
+        // https://datatracker.ietf.org/doc/html/rfc2877#section-9
+        this.isPrinterStartupResponseRecord = false;
+        this.printerStartupResponseCode = null;
+        this.printerStartupSystemName = null;
+        this.printerStartupObjectName = null;
+
+    }
+
+    serialize() {
+        // Alsways end with 'FFEF'X
+        let serialized = [];
+        this.commands.forEach(bytes => {
+            serialized = serialized.concat(bytes);
+        });
+        return x(serialized);
+    }
+
+    deserialize(data) {
+        const logicalRecordLengthBytes = x(data).array.slice(0, 2);
+        this.logicalRecordLength = x(logicalRecordLengthBytes).number;
+
+        const recordTypeBytes = x(data).array.slice(2, 4);
+        this.recordType = x(recordTypeBytes);
+
+        // Check if printer startup response record https://datatracker.ietf.org/doc/html/rfc2877#section-9
+        const printerStartupBytes = x(data).array.slice(4, 16);
+        const printerStartupBytesString = x(printerStartupBytes).string;
+        if (printerStartupBytesString == '90000560060020C0003D0000') {
+            let codepage = new Codepage('1141'); // TODO: Load from config
+            this.isPrinterStartupResponseRecord = true;
+
+            const responseCodeBytes = x(data).array.slice(16, 20);
+            const responseCode = codepage.decode(x(responseCodeBytes).array);
+            this.printerStartupResponseCode = responseCode;
+
+            const responseSystemNameBytes = x(data).array.slice(20, 28);
+            const responseSystemName = codepage.decode(x(responseSystemNameBytes).array);
+            this.printerStartupSystemName = responseSystemName;
+
+            const responseObjectNameBytes = x(data).array.slice(28, 38);
+            const responseObjectName = codepage.decode(x(responseObjectNameBytes).array);
+            this.printerStartupObjectName = responseObjectName;
+
+            return;
+        }
+
+        const variableRecordLengthBytes = x(data).array.slice(5, 7);
+        this.variableRecordLength = x(variableRecordLengthBytes).number;
+
+        const snaFlagsBits = x(data).array.slice(7, 8);
+        const snaFlags = x(snaFlagsBits).bitArray;
+
+        if(snaFlags[0] == 1) {
+            this.flags.ERR_DATA_STREAM_OUTPUT_ERROR = true;
+        } else {
+            this.flags.ERR_DATA_STREAM_OUTPUT_ERROR = false;
+        }
+
+        if(snaFlags[1] == 1) {
+            this.flags.ATN_ATTENTION_KEY_PRESSED = true;
+        } else {
+            this.flags.ATN_ATTENTION_KEY_PRESSED = false;
+        }
+
+        if(snaFlags[5] == 1) {
+            this.flags.SRQ_SYSTEM_REQUEST_KEY_PRESSED = true;
+        } else {
+            this.flags.SRQ_SYSTEM_REQUEST_KEY_PRESSED = false;
+        }
+
+        if(snaFlags[6] == 1) {
+            this.flags.TRQ_TEST_REQUEST_KEY_PRESSED = true;
+        } else {
+            this.flags.TRQ_TEST_REQUEST_KEY_PRESSED = false;
+        }
+
+        if(snaFlags[7] == 1) {
+            this.flags.HLP_HELP_IN_ERROR_STATE = true;
+        } else {
+            this.flags.HLP_HELP_IN_ERROR_STATE = false;
+        }
+
+        const opCodeBytes = x(data).array.slice(9, 10);
+        this.opcode = opCodeBytes[0];
+
+    }
+
+    static fromSerialized(data) {
+        let tn5250Message = Tn5250Message.create();
+        tn5250Message.deserialize(data);
+        return tn5250Message;
+    }
+
+    static create() {
+        return new Tn5250Message();
+    }
+
     static get TERMINAL() {
         return {
             IBM5555C01: "IBM-5555-C01", // 24 x 80 Double-Byte Character Set color display
@@ -358,5 +474,55 @@ export class Tn5250Message extends TelnetMessage {
             IBM52911:   "IBM-5291-1",   // 24 x 80 monochrome display
             IBM525111:  "IBM-5251-11"   // 24 x 80 monochrome display
         } 
+    }
+
+    static get OPCODE() {
+        return {
+            NO_OPERATION: 0x00,
+            INVITE_OPERATION: 0x01,
+            OUTPUT_ONLY: 0x02,
+            PUT_GET_OPERATION: 0x03,
+            SAVE_SCREEN_OPERATION: 0x04,
+            RESTORE_SCREEN_OPERATION: 0x05,
+            READ_IMMEDIATE_OPERATION: 0x06,
+            READ_SCREEN_OPERATION: 0x08,
+            CANCEL_INVITE_OPERATION: 0x0a,
+            TURN_ON_MESSAGE_LIGHT: 0x0b,
+            TURN_OFF_MESSAGE_LIGHT: 0x0c
+        }
+    }
+
+    static get PRINTER_STARTUP_RESPONSE_CODE() {
+        return {
+            VIRTUAL_DEVICE_HAS_LESS_FUNCTION_THAN_SOURCE_DEVICE:    'I901', // Virtual device has less function than source device
+            SESSION_SUCCESSFULLY_STARTED:                           'I902', // Session successfully started
+            AUTOMATIC_SIGNON_REQUESTED_BUT_NOT_ALLOWED:             'I906', //Automatic sign-on requested, but not allowed. Session still allowed; a sign-on screen will becoming.
+            DEVICE_DESCRIPTION_NOT_FOUND:                           '2702', // Device description not found.
+            CONTROLLER_DESCRIPTION_NOT_FOUND:                       '2703', // Controller description not found.
+            DAMAGED_DEVICE_DESCRIPTION:                             '2777', // Damaged device description.
+            DEVICE_NOT_VARIED_ON:                                   '8901', // Device not varied on.
+            DEVICE_NOT_AVAILABLE:                                   '8902', // Device not available.
+            DEVICE_NOT_VALID_FOR_SESSION:                           '8903', // Device not valid for session.
+            SESSION_INITIATION_FAILED:                              '8906', // Session initiation failed.
+            SESSION_FAILURE:                                        '8907', // Session failure.
+            CONTROLLER_NOT_VALID_FOR_SESSION:                       '8910', // Controller not valid for session.
+            NO_MATCHING_DEVICE_FOUND:                               '8916', // No matching device found.
+            NOT_AUTHORIZED_TO_OBJECT:                               '8917', // Not authorized to object.
+            JOB_CANCELED:                                           '8918', // Job canceled.
+            OBJECT_PARTIALLY_DAMAGED:                               '8920', // Object partially damaged.
+            COMMUNICATIONS_ERROR:                                   '8921', // Communications error.
+            NEGATIVE_RESPONSE_RECEIVED:                             '8922', // Negative response received.
+            STARTUP_RECORD_BUILT_INCORRECTLY:                       '8923', // Start-up record built incorrectly.
+            CREATION_OF_DEVICE_FAILED:                              '8925', // Creation of device failed.
+            CHANGE_OF_DEVICE_FAILED:                                '8928', // Change of device failed.
+            VARY_ON_OR_VARY_OFF_FAILED:                             '8929', // Vary on or vary off failed.
+            MESSAGE_QUEUE_DOES_NOT_EXIST:                           '8930', // Message queue does not exist.
+            STARTUP_FOR_S36_WSF_RECEIVED:                           '8934', // Start-up for S/36 WSF received.
+            SESSION_REJECTED:                                       '8935', // Session rejected.
+            SECURITY_FAILURE_ON_SESSION_ATTEMPT:                    '8936', // Security failure on session attempt.
+            AUTOMATIC_SIGNON_REJECTED:                              '8937', // Automatic sign-on rejected.
+            AUTOMATIC_CONFIGURATION_FAILED_OR_NOT_ALLOWED:          '8940', // Automatic configuration failed or not allowed.
+            SOURCE_SYSTEM_AT_INCOMPATIBLE_RELEASE:                  'I904' // Source system at incompatible release.
+        }
     }
 }

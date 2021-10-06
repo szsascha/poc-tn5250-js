@@ -59,8 +59,32 @@ class Bytes {
         return splitted;
     }
 
+    get number() {
+        let value = 0;
+        for (let i = 0; i < this.bytes.length; i++) {
+            value *= 256;
+            if (this.bytes[i] < 0) {
+                value += 256 + this.bytes[i];
+            } else {
+                value += this.bytes[i];
+            }
+        }
+        return value;
+    }
+
     get array() {
         return this.bytes;
+    }
+
+    get bitArray() {
+        let bits = [];
+        this.bytes.forEach(byte => {
+            for (let i = 7; i >= 0; i--) {
+                let bit = byte & (1 << i) ? 1 : 0;
+                bits.push(bit);
+             }
+        });
+        return bits;
     }
 
     get buffer() {
