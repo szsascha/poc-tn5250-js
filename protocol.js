@@ -362,6 +362,7 @@ export class Tn5250Message extends Protocol {
             HLP_HELP_IN_ERROR_STATE: false
         };
         this.opcode = 0x00;
+        this.escapeCommands = [];
 
         // Printer startup response record
         // https://datatracker.ietf.org/doc/html/rfc2877#section-9
@@ -525,4 +526,183 @@ export class Tn5250Message extends Protocol {
             SOURCE_SYSTEM_AT_INCOMPATIBLE_RELEASE:                  'I904' // Source system at incompatible release.
         }
     }
+}
+
+class Tn5250MessageEscapeCommand {
+
+    constructor(data) {
+        this.data = data;
+        this.commandCode = null;
+    }
+
+    serialize() {
+        Logger.log("serialize() not implemented");
+    }
+
+    deserialize(data) {
+        Logger.log("deserialize() not implemented");
+    }
+
+    static get COMMAND_CODE() {
+        return {
+            CU_CLEAR_UNIT: 0x40,
+            WTD_WRITE_TO_DISPLAY: 0x11,
+            READ_MDT_FIELDS: 0x52
+        }
+    }
+
+}
+
+class Tn5250MessageEscapeCommandWriteToDisplay extends Tn5250MessageEscapeCommand {
+
+    constructor(data = null) {
+        super(data);
+
+        this.writeToDisplayControlCharacterByte1 = {
+            RESET_PENDING_AID_LOCK_KEYBOARD: false,
+            CLEAR_MASTER_MDT_RESET_MDT_FLAGS_IN_NONBYPASS_FIELDS: false,
+            CLEAR_MASTER_MDT_RESET_MDT_FLAGS_IN_ALL_FIELDS: false,
+            NULL_NONBYPASS_FIELDS_WITH_MDT_ON: false,
+            NULL_ALL_NONBYPASS_FIELDS: false
+        }
+
+        this.writeToDisplayControlCharacterByte2 = {
+            RESET_BLINKING_CURSOR: false,
+            SET_BLINKING_CURSOR: false,
+            UNLOCK_THE_KEYBOARD_AND_RESET_ANY_PENDING_AID_BYTES: false,
+            SOUND_ALARM: false,
+            SET_MESSAGE_WAITING_INDICATOR_OFF: false,
+            SET_MESSAGE_WAITING_INDICATOR_ON: false
+        }
+
+        this.orderCommands = [];
+    }
+
+}
+
+class Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+    
+    constructor(data = null) {
+        this.data = data;
+        this.orderCode = null;
+    }
+
+    serialize() {
+        Logger.log("serialize() not implemented");
+    }
+
+    deserialize(data) {
+        Logger.log("deserialize() not implemented");
+    }
+
+    static get ORDER_CODE() {
+        return {
+            IC_INSERT_CURSOR: 0x13,
+            RA_REPEAT_TO_ADDRESS: 0x02,
+            SBA_SET_BUFFER_ADDRESS: 0x11,
+            SF_START_OF_FIELD: 0x1d,
+            SOH_START_OF_HEADER: 0x01
+        }
+    }
+
+}
+
+class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandStartOfHeader extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+    
+    constructor(data = null) {
+        super(data);
+
+        this.length = null;
+        this.startOfHeaderFlags = {
+            RIGHT_TO_LEFT_SCREEN_LEVEL_CURSOR_DIRECTION: false,
+            AUTOMATIC_LOCAL_SCREEN_REVERSE: false,
+            THE_CURSOR_IS_ALLOWED_TO_MOVE_ONLY_TO_INPUT_CAPABLE_POSITIONS: false
+        }
+        this.resequenceToField = null;
+        this.errorRow = null;
+
+        this.commandKey = {
+            PF1: false,
+            PF2: false,
+            PF3: false,
+            PF4: false,
+            PF5: false,
+            PF6: false,
+            PF7: false,
+            PF8: false,
+            PF9: false,
+            PF10: false,
+            PF11: false,
+            PF12: false,
+            PF13: false,
+            PF14: false,
+            PF15: false,
+            PF16: false,
+            PF17: false,
+            PF18: false,
+            PF19: false,
+            PF20: false,
+            PF21: false,
+            PF22: false,
+            PF23: false,
+            PF24: false
+        }
+
+    }
+
+}
+
+class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandSetBufferAddress extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+    
+    constructor(data = null) {
+        super(data);
+
+        this.rowAddress = 0;
+        this.columnAddress = 0;
+        this.repeatedCharacter = '';
+    }
+}
+
+class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandStartOfField extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+    
+    constructor(data = null) {
+        super(data);
+
+        this.fieldFormatWordId = null;
+        this.bypassField = false;
+        this.dupeOrFieldMarkEnable = false;
+        this.modified = false;
+        this.fieldShiftEditSpecification = null;
+        this.autoEnter = false;
+        this.fieldExitRequired = false;
+        this.monocase = false;
+        this.mandatoryEnter = false;
+        this.rightAdjustMandatoryFill = false;
+        this.attributeId = null;
+        this.columnSeparator = false;
+        this.underscore = false;
+        this.intensity = false;
+        this.reverseImage = false;
+        this.length = 0;
+        this.repeatedCharacter = null;
+    }
+}
+
+class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandRepeatToAddress extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+    
+    constructor(data = null) {
+        super(data);
+
+        this.rowAddress = 0;
+        this.columnAddress = 0;
+        this.repeatCharacter = '';
+    }
+}
+
+class Tn5250MessageEscapeCommandReadMdtFields extends Tn5250MessageEscapeCommandWriteToDisplay {
+
+    constructor(data = null) {
+        super(data);
+    }
+
 }
