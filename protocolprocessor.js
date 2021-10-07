@@ -212,7 +212,8 @@ export class Tn5250Processor extends ProtocolProcessor {
         
         // Handle packet fragmentation (only for 2 packets. More aren't to be expected atm)
         let message2 = null;
-        if (message.logicalRecordLength < x(data).array.length + 2) {
+        let packetSize = x(data).array.length - 2; // -2 because of 2 bytes for record length
+        if (message.logicalRecordLength < packetSize) {
             const nextData = x(data).array.slice(message.logicalRecordLength + 2);
             message2 = Tn5250Message.fromSerialized(nextData);
             Logger.log('[ RCV ] JSN: ' + JSON.stringify(message2));
