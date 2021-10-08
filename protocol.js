@@ -463,7 +463,7 @@ export class Tn5250Message extends Protocol {
 
         do {
             escapeCommandArray = x(escapeCommandArray).array.slice(length);
-            tn5250MessageEscapeCommand = createTn5250MessageEscapeCommand(nextEscapeCommandArray);
+            tn5250MessageEscapeCommand = createTn5250MessageEscapeCommand(escapeCommandArray);
             this.escapeCommands.push(tn5250MessageEscapeCommand);
             length = tn5250MessageEscapeCommand.length;
         } while(length <= 0);
@@ -565,7 +565,19 @@ class Tn5250MessageEscapeCommand {
     }
 
     deserialize(data) {
-        Logger.log("deserialize() not implemented");
+        this.commandCode = data[1];
+        this.length = 2; // Length alway min. 2 because escape code and command code
+
+        // Don't read more if clear unit
+        if (this.commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.CU_CLEAR_UNIT) {
+            return;
+        }
+
+        // Remove first two bytes from array
+        const dataWithoutCommandCode = data.slice(2);
+
+        this.object = createTn5250MessageEscapeCommandObject(this.commandCode, dataWithoutCommandCode);
+        this.length += this.object.length
     }
 
     static get COMMAND_CODE() {
@@ -579,18 +591,31 @@ class Tn5250MessageEscapeCommand {
 }
 
 function createTn5250MessageEscapeCommandObject(commandCode, data) {
-    if (commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WTD_WRITE_TO_DISPLAY) return new Tn5250MessageEscapeCommandObjectWriteToDisplay(data);
+    if (commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WTD_WRITE_TO_DISPLAY
+        || commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.READ_MDT_FIELDS) {
+        // Create write to display also for read mdt fields because they share the same structure
+        return new Tn5250MessageEscapeCommandObjectWriteToDisplay(data);
+    }
     return null;
 }
 
 class Tn5250MessageEscapeCommandObject {
 
     constructor(data) {
+        this.length = 0;
         this.data = data;
         if (data == null) this.data = [];
         if (new.target === Tn5250MessageEscapeCommandObject) {
           throw new TypeError("Cannot construct Tn5250MessageEscapeCommandObject instances directly");
         }
+    }
+
+    serialize() {
+        Logger.log("serialize() not implemented");
+    }
+
+    deserialize(data) {
+        Logger.log("deserialize() not implemented");
     }
 
 }
@@ -609,6 +634,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
         }
 
         this.writeToDisplayControlCharacterByte2 = {
+            CURSOR_DOES_NOT_MOVE_WHEN_KEYBOARD_UNLOCKS: false,
             RESET_BLINKING_CURSOR: false,
             SET_BLINKING_CURSOR: false,
             UNLOCK_THE_KEYBOARD_AND_RESET_ANY_PENDING_AID_BYTES: false,
@@ -618,6 +644,99 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
         }
 
         this.orderCommands = [];
+
+        this.deserialize(data);
+    }
+
+    deserialize(data) {
+        const controlCharacterByte1Bits = x(data[0]).bitArray;
+
+        if (controlCharacterByte1Bits[1] == 1) {
+            this.writeToDisplayControlCharacterByte1.RESET_PENDING_AID_LOCK_KEYBOARD = true;
+        } else {
+            this.writeToDisplayControlCharacterByte1.RESET_PENDING_AID_LOCK_KEYBOARD = false;
+        }
+        if (controlCharacterByte1Bits[2] == 1) {
+            this.writeToDisplayControlCharacterByte1.CLEAR_MASTER_MDT_RESET_MDT_FLAGS_IN_NONBYPASS_FIELDS = true;
+        } else {
+            this.writeToDisplayControlCharacterByte1.CLEAR_MASTER_MDT_RESET_MDT_FLAGS_IN_NONBYPASS_FIELDS = false;
+        }
+        if (controlCharacterByte1Bits[3] == 1) {
+            this.writeToDisplayControlCharacterByte1.CLEAR_MASTER_MDT_RESET_MDT_FLAGS_IN_ALL_FIELDS = true;
+        } else {
+            this.writeToDisplayControlCharacterByte1.CLEAR_MASTER_MDT_RESET_MDT_FLAGS_IN_ALL_FIELDS = false;
+        }
+        if (controlCharacterByte1Bits[4] == 1) {
+            this.writeToDisplayControlCharacterByte1.NULL_NONBYPASS_FIELDS_WITH_MDT_ON = true;
+        } else {
+            this.writeToDisplayControlCharacterByte1.NULL_NONBYPASS_FIELDS_WITH_MDT_ON = false;
+        }
+        if (controlCharacterByte1Bits[5] == 1) {
+            this.writeToDisplayControlCharacterByte1.NULL_ALL_NONBYPASS_FIELDS = true;
+        } else {
+            this.writeToDisplayControlCharacterByte1.NULL_ALL_NONBYPASS_FIELDS = false;
+        }
+
+
+        const controlCharacterByte2Bits = x(data[1]).bitArray;
+
+        if (controlCharacterByte2Bits[1] == 1) {
+            this.writeToDisplayControlCharacterByte2.CURSOR_DOES_NOT_MOVE_WHEN_KEYBOARD_UNLOCKS = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.CURSOR_DOES_NOT_MOVE_WHEN_KEYBOARD_UNLOCKS = false;
+        }
+        if (controlCharacterByte2Bits[2] == 1) {
+            this.writeToDisplayControlCharacterByte2.RESET_BLINKING_CURSOR = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.RESET_BLINKING_CURSOR = false;
+        }
+        if (controlCharacterByte2Bits[3] == 1) {
+            this.writeToDisplayControlCharacterByte2.SET_BLINKING_CURSOR = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.SET_BLINKING_CURSOR = false;
+        }
+        if (controlCharacterByte2Bits[4] == 1) {
+            this.writeToDisplayControlCharacterByte2.UNLOCK_THE_KEYBOARD_AND_RESET_ANY_PENDING_AID_BYTES = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.UNLOCK_THE_KEYBOARD_AND_RESET_ANY_PENDING_AID_BYTES = false;
+        }
+        if (controlCharacterByte2Bits[5] == 1) {
+            this.writeToDisplayControlCharacterByte2.SOUND_ALARM = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.SOUND_ALARM = false;
+        }
+        if (controlCharacterByte2Bits[6] == 1) {
+            this.writeToDisplayControlCharacterByte2.SET_MESSAGE_WAITING_INDICATOR_OFF = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.SET_MESSAGE_WAITING_INDICATOR_OFF = false;
+        }
+        if (controlCharacterByte2Bits[7] == 1) {
+            this.writeToDisplayControlCharacterByte2.SET_MESSAGE_WAITING_INDICATOR_ON = true;
+        } else {
+            this.writeToDisplayControlCharacterByte2.SET_MESSAGE_WAITING_INDICATOR_ON = false;
+        }
+
+        this.length += 2; // Add first 2 bytes to length;
+
+        // Return if no more data exists or next is escape code (0x04)
+        if (data.length <= 2 || data[2] == 0x04) {
+            return;
+        }
+
+        let preparedData = data.slice(3);
+        let endLoop = false;
+
+        do {
+            // Resolve order codes until next byte is escape code or end
+            const orderCode = preparedData[0];
+            preparedData = preparedData.slice(2);
+            const wtdOrderCommand = createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, preparedData);
+            this.orderCommands.push(wtdOrderCommand);
+            this.length += wtdOrderCommand.length + 1; // +1 because of order code
+            preparedData = preparedData.slice(wtdOrderCommand.length);
+            if (preparedData <= 2 || preparedData[2] == 0x04) endLoop = true;
+        } while(endLoop);
+
     }
 
 }
@@ -641,6 +760,7 @@ function createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderC
 class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
+        this.length = 0;
         this.data = data;
         if (data == null) this.data = [];
         this.orderCode = null;
@@ -708,7 +828,156 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader ex
         }
 
         this.deserialize(data);
+    }
 
+    deserialize(data) {
+        const orderCodeLength = x(data[0]).number;
+        this.length = orderCodeLength;
+        const headerFlagsBitArray = x(data[1]).bitArray;
+
+        if (headerFlagsBitArray[0] == 1) {
+            this.startOfHeaderFlags.RIGHT_TO_LEFT_SCREEN_LEVEL_CURSOR_DIRECTION = true;
+        } else {
+            this.startOfHeaderFlags.RIGHT_TO_LEFT_SCREEN_LEVEL_CURSOR_DIRECTION = false;
+        }
+        if (headerFlagsBitArray[1] == 1) {
+            this.startOfHeaderFlags.AUTOMATIC_LOCAL_SCREEN_REVERSE = true;
+        } else {
+            this.startOfHeaderFlags.AUTOMATIC_LOCAL_SCREEN_REVERSE = false;
+        }
+        if (headerFlagsBitArray[2] == 1) {
+            this.startOfHeaderFlags.THE_CURSOR_IS_ALLOWED_TO_MOVE_ONLY_TO_INPUT_CAPABLE_POSITIONS = true;
+        } else {
+            this.startOfHeaderFlags.THE_CURSOR_IS_ALLOWED_TO_MOVE_ONLY_TO_INPUT_CAPABLE_POSITIONS = false;
+        }
+
+        this.resequenceToField = x(data[3]).number;
+        this.errorRow = x(data[4]).number;
+
+        const commandKeySwitch1BitArray = x(data[5]).bitArray;
+        const commandKeySwitch2BitArray = x(data[6]).bitArray;
+        const commandKeySwitch3BitArray = x(data[7]).bitArray;
+
+        if (commandKeySwitch1BitArray[0] == 1) {
+            this.commandKey.PF24 = true;
+        } else {
+            this.commandKey.PF24 = false;
+        }
+        if (commandKeySwitch1BitArray[1] == 1) {
+            this.commandKey.PF23 = true;
+        } else {
+            this.commandKey.PF23 = false;
+        }
+        if (commandKeySwitch1BitArray[2] == 1) {
+            this.commandKey.PF22 = true;
+        } else {
+            this.commandKey.PF22 = false;
+        }
+        if (commandKeySwitch1BitArray[3] == 1) {
+            this.commandKey.PF21 = true;
+        } else {
+            this.commandKey.PF21 = false;
+        }
+        if (commandKeySwitch1BitArray[4] == 1) {
+            this.commandKey.PF20 = true;
+        } else {
+            this.commandKey.PF20 = false;
+        }
+        if (commandKeySwitch1BitArray[5] == 1) {
+            this.commandKey.PF19 = true;
+        } else {
+            this.commandKey.PF19 = false;
+        }
+        if (commandKeySwitch1BitArray[6] == 1) {
+            this.commandKey.PF18 = true;
+        } else {
+            this.commandKey.PF18 = false;
+        }
+        if (commandKeySwitch1BitArray[7] == 1) {
+            this.commandKey.PF17 = true;
+        } else {
+            this.commandKey.PF17 = false;
+        }
+        if (commandKeySwitch2BitArray[0] == 1) {
+            this.commandKey.PF16 = true;
+        } else {
+            this.commandKey.PF16 = false;
+        }
+        if (commandKeySwitch2BitArray[1] == 1) {
+            this.commandKey.PF15 = true;
+        } else {
+            this.commandKey.PF15 = false;
+        }
+        if (commandKeySwitch2BitArray[2] == 1) {
+            this.commandKey.PF14 = true;
+        } else {
+            this.commandKey.PF14 = false;
+        }
+        if (commandKeySwitch2BitArray[3] == 1) {
+            this.commandKey.PF13 = true;
+        } else {
+            this.commandKey.PF13 = false;
+        }
+        if (commandKeySwitch2BitArray[4] == 1) {
+            this.commandKey.PF12 = true;
+        } else {
+            this.commandKey.PF12 = false;
+        }
+        if (commandKeySwitch2BitArray[5] == 1) {
+            this.commandKey.PF11 = true;
+        } else {
+            this.commandKey.PF11 = false;
+        }
+        if (commandKeySwitch2BitArray[6] == 1) {
+            this.commandKey.PF10 = true;
+        } else {
+            this.commandKey.PF10 = false;
+        }
+        if (commandKeySwitch2BitArray[7] == 1) {
+            this.commandKey.PF9 = true;
+        } else {
+            this.commandKey.PF9 = false;
+        }
+        if (commandKeySwitch3BitArray[0] == 1) {
+            this.commandKey.PF8 = true;
+        } else {
+            this.commandKey.PF8 = false;
+        }
+        if (commandKeySwitch3BitArray[1] == 1) {
+            this.commandKey.PF7 = true;
+        } else {
+            this.commandKey.PF7 = false;
+        }
+        if (commandKeySwitch3BitArray[2] == 1) {
+            this.commandKey.PF6 = true;
+        } else {
+            this.commandKey.PF6 = false;
+        }
+        if (commandKeySwitch3BitArray[3] == 1) {
+            this.commandKey.PF5 = true;
+        } else {
+            this.commandKey.PF5 = false;
+        }
+        if (commandKeySwitch3BitArray[4] == 1) {
+            this.commandKey.PF4 = true;
+        } else {
+            this.commandKey.PF4 = false;
+        }
+        if (commandKeySwitch3BitArray[5] == 1) {
+            this.commandKey.PF3 = true;
+        } else {
+            this.commandKey.PF3 = false;
+        }
+        if (commandKeySwitch3BitArray[6] == 1) {
+            this.commandKey.PF2 = true;
+        } else {
+            this.commandKey.PF2 = false;
+        }
+        if (commandKeySwitch3BitArray[7] == 1) {
+            this.commandKey.PF1 = true;
+        } else {
+            this.commandKey.PF1 = false;
+        }
     }
 
 }
@@ -720,9 +989,149 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
 
         this.rowAddress = 0;
         this.columnAddress = 0;
-        this.repeatedCharacter = '';
+        this.repeatedCharacterOriginal = '';
+        this.repeatedCharacterPlain = '';
+        this.repeatedCharacterHtml = '';
 
         this.deserialize(data);
+    }
+
+    deserialize(data) {
+        this.rowAddress = x(data[0]).number;
+        this.columnAddress = x(data[1]).number;
+        this.length += 2;
+        const dataSliced = data.slice(3);
+
+        let isBlinkOpen = false;
+        let isUnderscoreOpen = false;
+        let isIntensityOpen = false;
+        let isReverseOpen = false;
+        let isNonDisplayOpen = false;
+        dataSliced.every(element => {
+            const elementByte = x(element);
+            this.repeatedCharacterOriginal += elementByte.string;
+
+            // Parse screen attribute if in range
+            if (element >= 0x20 || element < 0x40) {
+                const parsedScreenAttribute = this.parseScreenAttribute(element);
+
+                if (parsedScreenAttribute.BLINK) {
+                    if (!isBlinkOpen) {
+                        this.repeatedCharacterHtml += '<blink>';
+                        isBlinkOpen = true;
+                    } else {
+                        this.repeatedCharacterHtml += '</blink>';
+                        isBlinkOpen = false;
+                    }
+                }
+                if (parsedScreenAttribute.UNDERSCORE) {
+                    if (!isUnderscoreOpen) {
+                        this.repeatedCharacterHtml += '<u>';
+                        isUnderscoreOpen = true;
+                    } else {
+                        this.repeatedCharacterHtml += '</u>';
+                        isUnderscoreOpen = false;
+                    }
+                }
+                if (parsedScreenAttribute.INTENSITY) {
+                    if (!isIntensityOpen) {
+                        this.repeatedCharacterHtml += '<b>';
+                        isIntensityOpen = true;
+                    } else {
+                        this.repeatedCharacterHtml += '</b>';
+                        isIntensityOpen = false;
+                    }
+                }
+                if (parsedScreenAttribute.REVERSE) {
+                    if (!isReverseOpen) {
+                        this.repeatedCharacterHtml += '<span style="background-color: #000000; color: #ffffff;">';
+                        isReverseOpen = true;
+                    } else {
+                        this.repeatedCharacterHtml += '</span>';
+                        isReverseOpen = false;
+                    }
+                }
+                if (parsedScreenAttribute.NONDISPLAY) {
+                    if (!isNonDisplayOpen) {
+                        this.repeatedCharacterHtml += '<span style="display: hidden;">';
+                        isNonDisplayOpen = true;
+                    } else {
+                        this.repeatedCharacterHtml += '</span>';
+                        isNonDisplayOpen = false;
+                    }
+                }
+            } else {
+                this.repeatedCharacterPlain += elementByte.string;
+                this.repeatedCharacterHtml  += elementByte.string;
+            }
+
+            // Check if ending by ordercode
+            if (element <= 0x20) return false;
+            this.length++;
+
+            return true;
+        });
+
+        if (isBlinkOpen) {
+            this.repeatedCharacterHtml += '</blink>';
+            isBlinkOpen = false;
+        }
+        if (isUnderscoreOpen) {
+            this.repeatedCharacterHtml += '</u>';
+            isUnderscoreOpen = false;
+        }
+        if (isIntensityOpen) {
+            this.repeatedCharacterHtml += '</b>';
+            isIntensityOpen = false;
+        }
+        if (isReverseOpen) {
+            this.repeatedCharacterHtml += '</span>';
+            isReverseOpen = false;
+        }
+        if (isNonDisplayOpen) {
+            this.repeatedCharacterHtml += '</span>';
+            isNonDisplayOpen = false;
+        }
+    }
+
+    // http://bitsavers.informatik.uni-stuttgart.de/pdf/ibm/5250_5251/GA21-9247-2_5250_Information_Display_System_Functions_Reference_Manual_May80.pdf ; PAGE: 148
+    parseScreenAttribute(attribute) {
+        const attributeBits = x(attribute).bitArray;
+
+        const identifier = 
+                    attributeBits[0] 
+            + '' +  attributeBits[1]
+            + '' +  attributeBits[2];
+
+        let blink = false;
+        if (attributeBits[3] == 1) blink = true;
+
+        let underscore = false;
+        if (attributeBits[4] == 1) underscore = true;
+
+        let intensity = false;
+        if (attributeBits[5] == 1) intensity = true;
+
+        let reverse = false;
+        if (attributeBits[6] == 1) reverse = true;
+
+        let nondisplay = false;
+        if (underscore && intensity && reverse) {
+            nondisplay = true;
+            underscore = false;
+            intensity = false;
+            reverse = false;
+        }
+
+        return {
+            IDENTIFIER: identifier,
+            BLINK: blink,
+            UNDERSCORE: underscore,
+            INTENSITY: intensity,
+            REVERSE: reverse,
+            NONDISPLAY: nondisplay
+        }
+
     }
 }
 
@@ -745,23 +1154,101 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField ext
         this.columnSeparator = false;
         this.underscore = false;
         this.intensity = false;
-        this.reverseImage = false;
-        this.length = 0;
+        this.reverse = false;
+        this.nondisplay = false;
+        this.fieldLength = 0;
         this.repeatedCharacter = null;
 
         this.deserialize(data);
     }
+
+    deserialize(data) {
+        this.length += 5;
+
+        const fieldFormatWord1BitArray = x(data[0]).bitArray;
+        this.fieldFormatWordId = fieldFormatWord1BitArray[0] + '' + fieldFormatWord1BitArray[1];
+        if (fieldFormatWord1BitArray[2] == 1) {
+            this.bypassField = true;
+        } else {
+            this.bypassField = false;
+        }
+        if (fieldFormatWord1BitArray[3] == 1) {
+            this.dupeOrFieldMarkEnable = true;
+        } else {
+            this.dupeOrFieldMarkEnable = false;
+        }
+        if (fieldFormatWord1BitArray[4] == 1) {
+            this.modified = true;
+        } else {
+            this.modified = false;
+        }
+        this.fieldShiftEditSpecification = fieldFormatWord1BitArray[5] + '' + fieldFormatWord1BitArray[6] + '' + fieldFormatWord1BitArray[7];
+
+        const fieldFormatWord2BitArray = x(data[1]).bitArray;
+        if (fieldFormatWord2BitArray[0] == 1) {
+            this.autoEnter = true;
+        } else {
+            this.autoEnter = false;
+        }
+        if (fieldFormatWord2BitArray[1] == 1) {
+            this.fieldExitRequired = true;
+        } else {
+            this.fieldExitRequired = false;
+        }
+        if (fieldFormatWord2BitArray[2] == 1) {
+            this.monocase = true;
+        } else {
+            this.monocase = false;
+        }
+        if (fieldFormatWord2BitArray[4] == 1) {
+            this.mandatoryEnter = true;
+        } else {
+            this.mandatoryEnter = false;
+        }
+        this.rightAdjustMandatoryFill = fieldFormatWord2BitArray[5] + '' + fieldFormatWord2BitArray[6] + '' + fieldFormatWord2BitArray[7];
+
+        const fieldAttribute2BitArray = x(data[2]).bitArray;
+        this.attributeId = fieldAttribute2BitArray[0] + '' + fieldAttribute2BitArray[1] + '' + fieldAttribute2BitArray[2];
+        if (fieldAttribute2BitArray[3] == 1) {
+            this.columnSeparator = true;
+        } else {
+            this.columnSeparator = false;
+        }
+        if (fieldAttribute2BitArray[3] == 1) {
+            this.blink = true;
+        } else {
+            this.blink = false;
+        }
+        if (fieldAttribute2BitArray[4] == 1) {
+            this.underscore = true;
+        } else {
+            this.underscore = false;
+        }
+        if (fieldAttribute2BitArray[5] == 1) {
+            this.intensity = true;
+        } else {
+            this.intensity = false;
+        }
+        if (fieldAttribute2BitArray[6] == 1) {
+            this.reverse = true;
+        } else {
+            this.reverse = false;
+        }
+        if (this.underscore && this.intensity && this.reverse) {
+            this.nondisplay = true;
+            this.underscore = false;
+            this.intensity = false;
+            this.reverse = false;
+        }
+
+        this.fieldLength = x(data.slice(4, 6)).number;
+
+    }
 }
 
-class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress {
     
     constructor(data = null) {
         super(data);
-
-        this.rowAddress = 0;
-        this.columnAddress = 0;
-        this.repeatCharacter = '';
-
-        this.deserialize(data);
     }
 }
