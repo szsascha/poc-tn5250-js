@@ -27,7 +27,7 @@ export class TelnetMessageProcessor extends ProtocolProcessor {
 
         let result = [];
 
-        message.chunks.forEach(async chunk => {
+        message.chunks.forEach(chunk => {
             if (chunk.command == TelnetMessage.COMMAND.DO) {
                 result = result.concat(
                     this.processResultArrayToTelnetMessage(this.processDo(chunk))
