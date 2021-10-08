@@ -714,7 +714,7 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandRepeatToAddress extend
     }
 }
 
-class Tn5250MessageEscapeCommandReadMdtFields extends Tn5250MessageEscapeCommandWriteToDisplay {
+class Tn5250MessageEscapeCommandReadMdtFields extends Tn5250MessageEscapeCommandObjectWriteToDisplay {
 
     constructor(data = null) {
         super(data);
