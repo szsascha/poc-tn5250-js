@@ -532,7 +532,9 @@ class Tn5250MessageEscapeCommand {
 
     constructor(data) {
         this.data = data;
+        if (data == null) this.data = [];
         this.commandCode = null;
+        this.object = null;
     }
 
     serialize() {
@@ -553,7 +555,19 @@ class Tn5250MessageEscapeCommand {
 
 }
 
-class Tn5250MessageEscapeCommandWriteToDisplay extends Tn5250MessageEscapeCommand {
+class Tn5250MessageEscapeCommandObject {
+
+    constructor(data) {
+        this.data = data;
+        if (data == null) this.data = [];
+        if (new.target === Tn5250MessageEscapeCommandObject) {
+          throw new TypeError("Cannot construct Tn5250MessageEscapeCommandObject instances directly");
+        }
+    }
+
+}
+
+class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscapeCommandObject {
 
     constructor(data = null) {
         super(data);
@@ -584,6 +598,7 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         this.data = data;
+        if (data == null) this.data = [];
         this.orderCode = null;
     }
 
