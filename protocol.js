@@ -723,19 +723,21 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
             return;
         }
 
-        let preparedData = data.slice(3);
+        let preparedData = data.slice(2);
         let endLoop = false;
 
         do {
             // Resolve order codes until next byte is escape code or end
             const orderCode = preparedData[0];
-            preparedData = preparedData.slice(2);
+            preparedData = preparedData.slice(1);
             const wtdOrderCommand = createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, preparedData);
+            // TODO slice data of objects
             this.orderCommands.push(wtdOrderCommand);
+            console.log(JSON.stringify(wtdOrderCommand));
             this.length += wtdOrderCommand.length + 1; // +1 because of order code
-            preparedData = preparedData.slice(wtdOrderCommand.length);
+            preparedData = preparedData.slice(wtdOrderCommand.length + 1);
             if (preparedData <= 2 || preparedData[2] == 0x04) endLoop = true;
-        } while(endLoop);
+        } while(!endLoop);
 
     }
 
@@ -1000,7 +1002,14 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
         this.rowAddress = x(data[0]).number;
         this.columnAddress = x(data[1]).number;
         this.length += 2;
-        const dataSliced = data.slice(3);
+        const codepage = new Codepage('1141'); // TODO load by config
+        const dataSliced = data.slice(2);
+
+        // Check if more is coming. SBA can be only positioning. e.g. before input field
+        if (dataSliced.length > 0 && dataSliced[0] < 0x20) {
+            this.length--;
+            return;
+        }
 
         let isBlinkOpen = false;
         let isUnderscoreOpen = false;
@@ -1008,11 +1017,16 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
         let isReverseOpen = false;
         let isNonDisplayOpen = false;
         dataSliced.every(element => {
+            // Check if ending by ordercode
+            if (element <= 0x20) {
+                return false;
+            }
+            
             const elementByte = x(element);
-            this.repeatedCharacterOriginal += elementByte.string;
 
             // Parse screen attribute if in range
-            if (element >= 0x20 || element < 0x40) {
+            if (element >= 0x20 && element < 0x40) {
+                this.repeatedCharacterOriginal += elementByte.convertedString;
                 const parsedScreenAttribute = this.parseScreenAttribute(element);
 
                 if (parsedScreenAttribute.BLINK) {
@@ -1061,12 +1075,12 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
                     }
                 }
             } else {
-                this.repeatedCharacterPlain += elementByte.string;
-                this.repeatedCharacterHtml  += elementByte.string;
+                const convertedString = codepage.decode(elementByte.array);
+                this.repeatedCharacterOriginal += convertedString;
+                this.repeatedCharacterPlain += convertedString;
+                this.repeatedCharacterHtml  += convertedString;
             }
-
-            // Check if ending by ordercode
-            if (element <= 0x20) return false;
+            
             this.length++;
 
             return true;
@@ -1241,8 +1255,18 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField ext
             this.reverse = false;
         }
 
-        this.fieldLength = x(data.slice(4, 6)).number;
+        this.fieldLength = x(data.slice(4, 5)).number;
 
+        // Check if repeatedCharacter exists
+        if (data.length < 5 || (data[6] > 0x00 && data[6] < 0x20)) {
+            this.length--;
+            return;
+        }
+
+        const dataSliced = data.slice(5, 5 + this.fieldLength);
+        this.repeatedCharacter = x(dataSliced).convertedString;
+
+        this.length += this.fieldLength-1;
     }
 }
 
