@@ -528,6 +528,10 @@ export class Tn5250Message extends Protocol {
     }
 }
 
+function createTn5250MessageEscapeCommand(data) {
+    return new Tn5250MessageEscapeCommand(data);
+}
+
 class Tn5250MessageEscapeCommand {
 
     constructor(data) {
@@ -535,6 +539,7 @@ class Tn5250MessageEscapeCommand {
         if (data == null) this.data = [];
         this.commandCode = null;
         this.object = null;
+        this.deserialize(data);
     }
 
     serialize() {
@@ -553,6 +558,11 @@ class Tn5250MessageEscapeCommand {
         }
     }
 
+}
+
+function createTn5250MessageEscapeCommandObject(commandCode, data) {
+    if (commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WTD_WRITE_TO_DISPLAY) return new Tn5250MessageEscapeCommandObjectWriteToDisplay(data);
+    return null;
 }
 
 class Tn5250MessageEscapeCommandObject {
@@ -594,7 +604,23 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
 
 }
 
-class Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+function createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, data) {
+    if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SOH_START_OF_HEADER) {
+        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader(data);
+    }
+    if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SBA_SET_BUFFER_ADDRESS) {
+        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress(data);
+    }
+    if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SF_START_OF_FIELD) {
+        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField(data);
+    }
+    if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.RA_REPEAT_TO_ADDRESS) {
+        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress(data);
+    }
+    return null;
+}
+
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         this.data = data;
@@ -622,7 +648,7 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
 
 }
 
-class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandStartOfHeader extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         super(data);
@@ -663,11 +689,13 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandStartOfHeader extends 
             PF24: false
         }
 
+        this.deserialize(data);
+
     }
 
 }
 
-class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandSetBufferAddress extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         super(data);
@@ -675,10 +703,12 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandSetBufferAddress exten
         this.rowAddress = 0;
         this.columnAddress = 0;
         this.repeatedCharacter = '';
+
+        this.deserialize(data);
     }
 }
 
-class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandStartOfField extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         super(data);
@@ -700,10 +730,12 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandStartOfField extends T
         this.reverseImage = false;
         this.length = 0;
         this.repeatedCharacter = null;
+
+        this.deserialize(data);
     }
 }
 
-class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandRepeatToAddress extends Tn5250MessageEscapeCommandWriteToDisplayOrderCommand {
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         super(data);
@@ -711,13 +743,7 @@ class Tn5250MessageEscapeCommandWriteToDisplayOrderCommandRepeatToAddress extend
         this.rowAddress = 0;
         this.columnAddress = 0;
         this.repeatCharacter = '';
+
+        this.deserialize(data);
     }
-}
-
-class Tn5250MessageEscapeCommandReadMdtFields extends Tn5250MessageEscapeCommandObjectWriteToDisplay {
-
-    constructor(data = null) {
-        super(data);
-    }
-
 }
