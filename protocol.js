@@ -374,7 +374,7 @@ export class Tn5250Message extends Protocol {
     }
 
     serialize() {
-        // Alsways end with 'FFEF'X
+        // Always end with 'FFEF'X
         let serialized = [];
         this.commands.forEach(bytes => {
             serialized = serialized.concat(bytes);
@@ -450,6 +450,23 @@ export class Tn5250Message extends Protocol {
         const opCodeBytes = x(data).array.slice(9, 10);
         this.opcode = opCodeBytes[0];
 
+        // Create escape commands
+        let escapeCommandArray = x(data).array.slice(10); 
+        // Remove last 2 elements ('FFEF'x)
+        escapeCommandArray.pop();
+        escapeCommandArray.pop();
+
+        let tn5250MessageEscapeCommand = createTn5250MessageEscapeCommand(escapeCommandArray);
+        this.escapeCommands.push(tn5250MessageEscapeCommand);
+        let length = tn5250MessageEscapeCommand.length;
+        if (length <= 0) return;
+
+        do {
+            escapeCommandArray = x(escapeCommandArray).array.slice(length);
+            tn5250MessageEscapeCommand = createTn5250MessageEscapeCommand(nextEscapeCommandArray);
+            this.escapeCommands.push(tn5250MessageEscapeCommand);
+            length = tn5250MessageEscapeCommand.length;
+        } while(length <= 0);
     }
 
     static fromSerialized(data) {
@@ -539,6 +556,7 @@ class Tn5250MessageEscapeCommand {
         if (data == null) this.data = [];
         this.commandCode = null;
         this.object = null;
+        this.length = 0;
         this.deserialize(data);
     }
 
