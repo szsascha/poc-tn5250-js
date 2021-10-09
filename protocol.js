@@ -735,7 +735,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
             const orderCode = preparedData[0];
             preparedData = preparedData.slice(1);
             const wtdOrderCommand = createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, preparedData);
-            // TODO slice data of objects
+            wtdOrderCommand.data = wtdOrderCommand.data.slice(1, wtdOrderCommand.length + 1);
             this.orderCommands.push(wtdOrderCommand);
             console.log(JSON.stringify(wtdOrderCommand));
             this.length += wtdOrderCommand.length + 1; // +1 because of order code
