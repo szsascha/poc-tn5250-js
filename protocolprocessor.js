@@ -1,9 +1,10 @@
 "use strict";
 
-import { TelnetMessage, TelnetMessageChunkObjectNewEnvironment, TelnetMessageChunkObject, createTelnetMessageChunkObject, Tn5250Message } from "./protocol.js";
+import { TelnetMessage, TelnetMessageChunkObjectNewEnvironment, TelnetMessageChunkObject, createTelnetMessageChunkObject, Tn5250Message, Tn5250MessageEscapeCommand, Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand } from "./protocol.js";
 import { Logger } from './logging.js'
 import { x } from "./hexutils.js";
 import { Session, SessionState } from './session.js'
+import { Screen } from './screen.js';
 
 class ProtocolProcessor {
 
@@ -208,7 +209,8 @@ export class Tn5250Processor extends ProtocolProcessor {
 
     process(data) {
         const message = Tn5250Message.fromSerialized(data);
-        Logger.log('[ RCV ] JSN: ' + JSON.stringify(message));
+        //Logger.log('[ RCV ] JSN: ' + JSON.stringify(message));
+        this.processMessage(message);
         
         // Handle packet fragmentation (only for 2 packets. More aren't to be expected atm)
         let message2 = null;
@@ -216,10 +218,32 @@ export class Tn5250Processor extends ProtocolProcessor {
         if (message.logicalRecordLength < packetSize) {
             const nextData = x(data).array.slice(message.logicalRecordLength + 2);
             message2 = Tn5250Message.fromSerialized(nextData);
-            Logger.log('[ RCV ] JSN: ' + JSON.stringify(message2));
+            this.processMessage(message2);
+            //Logger.log('[ RCV ] JSN: ' + JSON.stringify(message2));
         }
 
         return [];
+    }
+
+    processMessage(message) {
+        if (message.isPrinterStartupResponseRecord) return;
+
+        const screen = new Screen();
+        screen.init();
+
+        message.escapeCommands.forEach(escapeCommand => {
+            if (escapeCommand.commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.CU_CLEAR_UNIT) {
+                screen.clear();
+            }
+            if (escapeCommand.commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WTD_WRITE_TO_DISPLAY) {
+                escapeCommand.object.orderCommands.forEach(orderCommand => {
+                    if (orderCommand.orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SBA_SET_BUFFER_ADDRESS) {
+                        screen.push(orderCommand.rowAddress, orderCommand.columnAddress, orderCommand.repeatedCharacterPlain);
+                    }
+                });
+            }
+        });
+        screen.render();
     }
 
 }

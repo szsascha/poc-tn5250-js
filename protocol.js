@@ -549,7 +549,7 @@ function createTn5250MessageEscapeCommand(data) {
     return new Tn5250MessageEscapeCommand(data);
 }
 
-class Tn5250MessageEscapeCommand {
+export class Tn5250MessageEscapeCommand {
 
     constructor(data) {
         this.data = data;
@@ -737,7 +737,6 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
             const wtdOrderCommand = createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, preparedData);
             wtdOrderCommand.data = wtdOrderCommand.data.slice(1, wtdOrderCommand.length + 1);
             this.orderCommands.push(wtdOrderCommand);
-            console.log(JSON.stringify(wtdOrderCommand));
             this.length += wtdOrderCommand.length + 1; // +1 because of order code
             preparedData = preparedData.slice(wtdOrderCommand.length + 1);
             
@@ -763,7 +762,7 @@ function createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderC
     return null;
 }
 
-class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
+export class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         this.length = 0;
@@ -797,6 +796,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader ex
     constructor(data = null) {
         super(data);
 
+        this.orderCode = Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SOH_START_OF_HEADER;
         this.length = null;
         this.startOfHeaderFlags = {
             RIGHT_TO_LEFT_SCREEN_LEVEL_CURSOR_DIRECTION: false,
@@ -993,6 +993,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
     constructor(data = null) {
         super(data);
 
+        this.orderCode = Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SBA_SET_BUFFER_ADDRESS;
         this.rowAddress = 0;
         this.columnAddress = 0;
         this.repeatedCharacterOriginal = '';
@@ -1166,6 +1167,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField ext
     constructor(data = null) {
         super(data);
 
+        this.orderCode = Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SF_START_OF_FIELD;
         this.fieldFormatWordId = null;
         this.bypassField = false;
         this.dupeOrFieldMarkEnable = false;
@@ -1286,5 +1288,6 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress 
     
     constructor(data = null) {
         super(data);
+        this.orderCode = Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.RA_REPEAT_TO_ADDRESS;
     }
 }
