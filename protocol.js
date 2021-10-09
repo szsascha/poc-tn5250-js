@@ -727,6 +727,10 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
         let endLoop = false;
 
         do {
+            if (preparedData <= 2 || preparedData[0] == 0x04) {
+                endLoop = true;
+                break;
+            }
             // Resolve order codes until next byte is escape code or end
             const orderCode = preparedData[0];
             preparedData = preparedData.slice(1);
@@ -736,7 +740,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
             console.log(JSON.stringify(wtdOrderCommand));
             this.length += wtdOrderCommand.length + 1; // +1 because of order code
             preparedData = preparedData.slice(wtdOrderCommand.length + 1);
-            if (preparedData <= 2 || preparedData[2] == 0x04) endLoop = true;
+            
         } while(!endLoop);
 
     }
@@ -1006,7 +1010,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
         const dataSliced = data.slice(2);
 
         // Check if more is coming. SBA can be only positioning. e.g. before input field
-        if (dataSliced.length > 0 && dataSliced[0] < 0x20) {
+        if (dataSliced.length > 0 && (dataSliced[0] > 0x00 && dataSliced[0] < 0x20)) {
             this.length--;
             return;
         }
@@ -1016,9 +1020,14 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
         let isIntensityOpen = false;
         let isReverseOpen = false;
         let isNonDisplayOpen = false;
+        let endByChar = false;
         dataSliced.every(element => {
             // Check if ending by ordercode
-            if (element <= 0x20) {
+            if (element > 0x00 && element < 0x20) {
+                return false;
+            }
+            if (element == 0x20) {
+                endByChar = true;
                 return false;
             }
             
@@ -1105,6 +1114,9 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
         if (isNonDisplayOpen) {
             this.repeatedCharacterHtml += '</span>';
             isNonDisplayOpen = false;
+        }
+        if (!endByChar) {
+            this.length--;
         }
     }
 
