@@ -207,6 +207,7 @@ export class Tn5250Processor extends ProtocolProcessor {
     constructor() {
         super();
         this.screenCount = 0;
+        this.finalDataSent = false;
     }
 
     process(data) {
@@ -247,7 +248,7 @@ export class Tn5250Processor extends ProtocolProcessor {
                 });
             }
             if (escapeCommand.commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WRITE_STRUCTURED_FIELD) {
-                console.log('WriteStructuredField');
+                // Moved processing to prepareResponse to get PoC finished
             }
         });
         if (render) {
@@ -281,6 +282,18 @@ export class Tn5250Processor extends ProtocolProcessor {
             message.orderCodes.push(passwordOrderCode);
 
             returnArray.push(message);
+        }
+
+        // Reply structured field
+        if (this.screenCount > 1 && !this.finalDataSent) {
+            const message = new Tn5250Message();
+            message.opcode = Tn5250Message.OPCODE.PUT_GET_OPERATION;
+            message.rowAddress = 0;
+            message.columnAddress = 0;
+            message.attentionIdentification = Tn5250Message.AIDCODE.AID_INBOUND_WRITE_STRUCTURED_FIELD;
+
+            returnArray.push(message);
+            this.finalDataSent = true;
         }
 
         return returnArray;

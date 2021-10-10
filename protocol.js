@@ -417,6 +417,77 @@ export class Tn5250Message extends Protocol {
             this.data = this.data.concat(serializedEscapeCommand.array);
         });
 
+        if (this.attentionIdentification == Tn5250Message.AIDCODE.AID_INBOUND_WRITE_STRUCTURED_FIELD) {
+            // Fix in PoC
+            this.data = this.data.concat([
+                // Structured field length
+                0x00, 0x44,
+
+                // Structured field class
+                0xd9,
+
+                // Structured field type
+                0x70,
+
+                // Flag
+                0x80,
+
+                // Controller hardware class
+                0x06, 0x00,
+
+                // Controller code level
+                0x03, 0x02, 0x00,
+
+                // Reserved flags
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+                // Device type
+                0x01,
+
+                // Device type
+                0xf3, 0xf1, 0xf7, 0xf9,
+
+                // Device model
+                0xf0, 0xf0, 0xf2,
+
+                // Keyboard id
+                0x01,
+
+                // Extended keyboard id
+                0x01,
+
+                // Flags reserved
+                0x00,
+
+                // Display serial number
+                0x00, 0x00, 0x70, 0x12,
+
+                // Maximum number of input fields
+                0x01, 0xf4,
+
+                // Reserved
+                0x00, 0x00, 0x00,
+
+                // Flags
+                0x7b,
+
+                // Flags
+                0x31,
+
+                // No DBCS
+                0x00,
+
+                // Flags no graphics
+                0x00,
+
+                // Reserved
+                0x0f, 0xc8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+                // Field data
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]);
+        }
+
         // Always end with 'FFEF'X
         this.data = this.data.concat([0xff, 0xef]);
 
@@ -503,6 +574,8 @@ export class Tn5250Message extends Protocol {
         escapeCommandArray.pop();
         escapeCommandArray.pop();
 
+        if (escapeCommandArray.length <= 0) return;
+
         let tn5250MessageEscapeCommand = createTn5250MessageEscapeCommand(escapeCommandArray);
         this.escapeCommands.push(tn5250MessageEscapeCommand);
         let length = tn5250MessageEscapeCommand.length;
@@ -574,7 +647,8 @@ export class Tn5250Message extends Protocol {
             ROLL_UP: 0xf5,
             PRINT: 0xf6,
             RECORD_BACKSPACE: 0xf8,
-            AUTO_ENTER: 0x3f
+            AUTO_ENTER: 0x3f,
+            AID_INBOUND_WRITE_STRUCTURED_FIELD: 0x88
         };
     }
 
@@ -887,6 +961,11 @@ function createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderC
         orderCommand.deserialize(data);
         return orderCommand;
     }
+    if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.IC_INSERT_CURSOR) {
+        const orderCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandInsertCursor(data);
+        orderCommand.deserialize(data);
+        return orderCommand;
+    }
     return null;
 }
 
@@ -1158,12 +1237,13 @@ export class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBuffer
         let isReverseOpen = false;
         let isNonDisplayOpen = false;
         let endByChar = false;
+        let i = 0;
         dataSliced.every(element => {
             // Check if ending by ordercode
             if (element > 0x00 && element < 0x20) {
                 return false;
             }
-            if (element == 0x20) {
+            if (element == 0x20 && dataSliced[i+1] != 0x00) {
                 endByChar = true;
                 return false;
             }
@@ -1228,6 +1308,7 @@ export class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBuffer
             }
             
             this.length++;
+            i++;
 
             return true;
         });
@@ -1423,5 +1504,23 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress 
     constructor(data = null) {
         super(data);
         this.orderCode = Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.RA_REPEAT_TO_ADDRESS;
+    }
+}
+
+class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandInsertCursor extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
+    
+    constructor(data = null) {
+        super(data);
+
+        this.rowAddress = 0;
+        this.columnAddress = 0;
+
+        this.orderCode = Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.IC_INSERT_CURSOR;
+    }
+
+    deserialize(data) {
+        this.length += 2;
+        this.rowAddress = x(data[0]).number;
+        this.columnAddress = x(data[1]).number;
     }
 }
