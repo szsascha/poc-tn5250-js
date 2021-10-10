@@ -506,7 +506,7 @@ export class Tn5250Message extends Protocol {
         let tn5250MessageEscapeCommand = createTn5250MessageEscapeCommand(escapeCommandArray);
         this.escapeCommands.push(tn5250MessageEscapeCommand);
         let length = tn5250MessageEscapeCommand.length;
-        if (length <= 0) return;
+        if (length <= 0 || escapeCommandArray.length - length <= 0) return;
 
         do {
             escapeCommandArray = x(escapeCommandArray).array.slice(length);
@@ -668,7 +668,8 @@ export class Tn5250MessageEscapeCommand {
         return {
             CU_CLEAR_UNIT: 0x40,
             WTD_WRITE_TO_DISPLAY: 0x11,
-            READ_MDT_FIELDS: 0x52
+            READ_MDT_FIELDS: 0x52,
+            WRITE_STRUCTURED_FIELD: 0xf3
         }
     }
 
@@ -679,6 +680,11 @@ function createTn5250MessageEscapeCommandObject(commandCode, data) {
         || commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.READ_MDT_FIELDS) {
         // Create write to display also for read mdt fields because they share the same structure
         const escapeCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplay(data);
+        escapeCommand.deserialize(data);
+        return escapeCommand;
+    }
+    if (commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WRITE_STRUCTURED_FIELD) {
+        const escapeCommand = new Tn5250MessageEscapeCommandObjectWriteStructuredField(data);
         escapeCommand.deserialize(data);
         return escapeCommand;
     }
@@ -828,6 +834,36 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
 
     }
 
+}
+
+class Tn5250MessageEscapeCommandObjectWriteStructuredField extends Tn5250MessageEscapeCommandObject {
+
+    constructor(data = null) {
+        super(data);
+
+        this.structuredFieldLength = 0;
+        this.structuredFieldClass = null;
+        this.structuredFieldType = null;
+    }
+
+    deserialize(data) {
+        this.structuredFieldLength = x(data[1]).number;
+        this.length = this.structuredFieldLength;
+        this.structuredFieldClass = data[2];
+        this.structuredFieldType = data[3];
+    }
+
+    static get STRUCTURED_FIELD_CLASS() {
+        return {
+            TN5250_CLASS_OF_STRUCTURED_FIELD: 0xd9
+        };
+    }
+
+    static get STRUCTURED_FIELD_TYPE() {
+        return {
+            TN5250_QUERY: 0x70
+        };
+    }
 }
 
 function createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, data) {

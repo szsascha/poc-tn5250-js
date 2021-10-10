@@ -232,6 +232,7 @@ export class Tn5250Processor extends ProtocolProcessor {
 
         const screen = new Screen();
         screen.init();
+        let render = false;
 
         message.escapeCommands.forEach(escapeCommand => {
             if (escapeCommand.commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.CU_CLEAR_UNIT) {
@@ -241,11 +242,17 @@ export class Tn5250Processor extends ProtocolProcessor {
                 escapeCommand.object.orderCommands.forEach(orderCommand => {
                     if (orderCommand.orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SBA_SET_BUFFER_ADDRESS) {
                         screen.push(orderCommand.rowAddress, orderCommand.columnAddress, orderCommand.repeatedCharacterPlain);
+                        render = true;
                     }
                 });
             }
+            if (escapeCommand.commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WRITE_STRUCTURED_FIELD) {
+                console.log('WriteStructuredField');
+            }
         });
-        screen.render();
+        if (render) {
+            screen.render();
+        }
         this.screenCount++;
     }
 
@@ -273,7 +280,6 @@ export class Tn5250Processor extends ProtocolProcessor {
             passwordOrderCode.repeatedCharacterOriginal = Credentials.PASSWORD;
             message.orderCodes.push(passwordOrderCode);
 
-            //console.log(message.serialize().string);
             returnArray.push(message);
         }
 
