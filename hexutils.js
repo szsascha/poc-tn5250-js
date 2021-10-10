@@ -18,6 +18,22 @@ export function bytesFromString(string, encoding = 'utf8') {
     return bytes;
 }
 
+export function bytesFromNumber(number, bytes = 1) {
+    let byteArray = [];
+
+    for (let i = 0; i < bytes; i++) { 
+        byteArray.push(0);
+    }
+
+    for (let i = 0; i < byteArray.length; i++) {
+        const byte = number & 0xff;
+        byteArray[i] = byte;
+        number = (number - byte) / 256 ;
+    }
+
+    return byteArray;
+}
+
 class Bytes {
 
     constructor(data) {

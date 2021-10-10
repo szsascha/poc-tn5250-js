@@ -1,10 +1,11 @@
 "use strict";
 
-import { TelnetMessage, TelnetMessageChunkObjectNewEnvironment, TelnetMessageChunkObject, createTelnetMessageChunkObject, Tn5250Message, Tn5250MessageEscapeCommand, Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand } from "./protocol.js";
-import { Logger } from './logging.js'
+import { TelnetMessage, TelnetMessageChunkObjectNewEnvironment, TelnetMessageChunkObject, createTelnetMessageChunkObject, Tn5250Message, Tn5250MessageEscapeCommand, Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand, Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress } from "./protocol.js";
+import { Logger } from './logging.js';
 import { x } from "./hexutils.js";
-import { Session, SessionState } from './session.js'
+import { Session, SessionState } from './session.js';
 import { Screen } from './screen.js';
+import { Credentials } from './credentials.js';
 
 class ProtocolProcessor {
 
@@ -205,6 +206,7 @@ export class Tn5250Processor extends ProtocolProcessor {
 
     constructor() {
         super();
+        this.screenCount = 0;
     }
 
     process(data) {
@@ -222,7 +224,7 @@ export class Tn5250Processor extends ProtocolProcessor {
             //Logger.log('[ RCV ] JSN: ' + JSON.stringify(message2));
         }
 
-        return [];
+        return this.prepareResponse();
     }
 
     processMessage(message) {
@@ -244,6 +246,38 @@ export class Tn5250Processor extends ProtocolProcessor {
             }
         });
         screen.render();
+        this.screenCount++;
+    }
+
+    prepareResponse() {
+        const returnArray = [];
+        // Screen counter for PoC. No console interaction in PoC. Just hard coded commands.
+
+        // Screen 1 is login: Send input back
+        if (this.screenCount == 1) {
+            const message = new Tn5250Message();
+            message.opcode = Tn5250Message.OPCODE.PUT_GET_OPERATION;
+            message.rowAddress = 6;
+            message.columnAddress = 32;
+            message.attentionIdentification = Tn5250Message.AIDCODE.ENTER_REC_ADV;
+            
+            const usernameOrderCode = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress();
+            usernameOrderCode.rowAddress = 5;
+            usernameOrderCode.columnAddress = 25;
+            usernameOrderCode.repeatedCharacterOriginal = Credentials.USERNAME;
+            message.orderCodes.push(usernameOrderCode);
+
+            const passwordOrderCode = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress();
+            passwordOrderCode.rowAddress = 6;
+            passwordOrderCode.columnAddress = 25;
+            passwordOrderCode.repeatedCharacterOriginal = Credentials.PASSWORD;
+            message.orderCodes.push(passwordOrderCode);
+
+            //console.log(message.serialize().string);
+            returnArray.push(message);
+        }
+
+        return returnArray;
     }
 
 }

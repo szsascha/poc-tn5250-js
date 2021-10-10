@@ -1,6 +1,6 @@
 "use strict";
 
-import { x, bytesFromString } from "./hexutils.js";
+import { x, bytesFromString, bytesFromNumber } from "./hexutils.js";
 import { Logger } from './logging.js';
 import { Codepage } from './codepage.js';
 
@@ -351,6 +351,7 @@ export class Tn5250Message extends Protocol {
 
     constructor() {
         super();
+        this.data = [];
         this.logicalRecordLength = 0;
         this.recordType = null;
         this.variableHeaderLength = 0;
@@ -362,7 +363,11 @@ export class Tn5250Message extends Protocol {
             HLP_HELP_IN_ERROR_STATE: false
         };
         this.opcode = 0x00;
+        this.rowAddress = 0;
+        this.columnAddress = 0;
+        this.attentionIdentification = null;
         this.escapeCommands = [];
+        this.orderCodes = []; // Client sends ordercodes on top layer
 
         // Printer startup response record
         // https://datatracker.ietf.org/doc/html/rfc2877#section-9
@@ -374,12 +379,54 @@ export class Tn5250Message extends Protocol {
     }
 
     serialize() {
-        // Always end with 'FFEF'X
-        let serialized = [];
-        this.commands.forEach(bytes => {
-            serialized = serialized.concat(bytes);
+        this.data = [];
+
+        // Set logical record length
+        this.data = this.data.concat([0x00, 0x00]);
+
+        // Set SNA record type
+        this.data = this.data.concat([0x12, 0xa0]);
+
+        // Set reserved flags
+        this.data = this.data.concat([0x00, 0x00]);
+
+        // Set variable record length
+        this.data = this.data.concat([0x04]);
+
+        // Set SNA flags (not implemented in PoC)
+        this.data = this.data.concat([0x00]);
+
+        // Set reserved flags
+        this.data = this.data.concat([0x80]);
+
+        // Set operation code
+        this.data = this.data.concat(this.opcode);
+
+        // Set row address
+        this.data = this.data.concat(bytesFromNumber(this.rowAddress));
+
+        // Set column address
+        this.data = this.data.concat(bytesFromNumber(this.columnAddress));
+
+        // Set attention identification
+        this.data = this.data.concat(this.attentionIdentification);
+
+        // Add escape commands
+        this.orderCodes.forEach(escapeCommand => {
+            const serializedEscapeCommand = escapeCommand.serialize();
+            this.data = this.data.concat(serializedEscapeCommand.array);
         });
-        return x(serialized);
+
+        // Always end with 'FFEF'X
+        this.data = this.data.concat([0xff, 0xef]);
+
+        // Add record length
+        this.logicalRecordLength = this.data.length-2;
+        const lengthBytes = bytesFromNumber(this.logicalRecordLength, 2).concat(this.data);
+        this.data[1] = lengthBytes[0];
+        this.data[0] = lengthBytes[1];
+
+        return x(this.data);
     }
 
     deserialize(data) {
@@ -494,6 +541,43 @@ export class Tn5250Message extends Protocol {
         } 
     }
 
+    static get AIDCODE() {
+        return {
+            PF1: 0x31,
+            PF2: 0x32,
+            PF3: 0x33,
+            PF4: 0x34,
+            PF5: 0x35,
+            PF6: 0x36,
+            PF7: 0x37,
+            PF8: 0x38,
+            PF9: 0x39,
+            PF10: 0x3a,
+            PF11: 0x3b,
+            PF12: 0x3c,
+            PF13: 0xb1,
+            PF14: 0xb2,
+            PF15: 0xb3,
+            PF16: 0xb4,
+            PF17: 0xb5,
+            PF18: 0xb6,
+            PF19: 0xb7,
+            PF20: 0xb8,
+            PF21: 0xb9,
+            PF22: 0xba,
+            PF23: 0xbb,
+            PF24: 0xbc,
+            CLEAR: 0xbd,
+            ENTER_REC_ADV: 0xf1,
+            HELP: 0xf3,
+            ROLL_DOWN: 0xf4,
+            ROLL_UP: 0xf5,
+            PRINT: 0xf6,
+            RECORD_BACKSPACE: 0xf8,
+            AUTO_ENTER: 0x3f
+        };
+    }
+
     static get OPCODE() {
         return {
             NO_OPERATION: 0x00,
@@ -594,7 +678,9 @@ function createTn5250MessageEscapeCommandObject(commandCode, data) {
     if (commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.WTD_WRITE_TO_DISPLAY
         || commandCode == Tn5250MessageEscapeCommand.COMMAND_CODE.READ_MDT_FIELDS) {
         // Create write to display also for read mdt fields because they share the same structure
-        return new Tn5250MessageEscapeCommandObjectWriteToDisplay(data);
+        const escapeCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplay(data);
+        escapeCommand.deserialize(data);
+        return escapeCommand;
     }
     return null;
 }
@@ -644,8 +730,6 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
         }
 
         this.orderCommands = [];
-
-        this.deserialize(data);
     }
 
     deserialize(data) {
@@ -748,16 +832,24 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplay extends Tn5250MessageEscape
 
 function createTn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand(orderCode, data) {
     if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SOH_START_OF_HEADER) {
-        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader(data);
+        const orderCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader(data);
+        orderCommand.deserialize(data);
+        return orderCommand;
     }
     if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SBA_SET_BUFFER_ADDRESS) {
-        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress(data);
+        const orderCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress(data);
+        orderCommand.deserialize(data);
+        return orderCommand;
     }
     if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.SF_START_OF_FIELD) {
-        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField(data);
+        const orderCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField(data);
+        orderCommand.deserialize(data);
+        return orderCommand;
     }
     if (orderCode == Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand.ORDER_CODE.RA_REPEAT_TO_ADDRESS) {
-        return new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress(data);
+        const orderCommand = new Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandRepeatToAddress(data);
+        orderCommand.deserialize(data);
+        return orderCommand;
     }
     return null;
 }
@@ -832,8 +924,6 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader ex
             PF23: false,
             PF24: false
         }
-
-        this.deserialize(data);
     }
 
     deserialize(data) {
@@ -988,7 +1078,7 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfHeader ex
 
 }
 
-class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
+export class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress extends Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommand {
     
     constructor(data = null) {
         super(data);
@@ -999,8 +1089,18 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandSetBufferAddress
         this.repeatedCharacterOriginal = '';
         this.repeatedCharacterPlain = '';
         this.repeatedCharacterHtml = '';
+    }
 
-        this.deserialize(data);
+    serialize() {
+        this.data = [];
+        const codepage = new Codepage('1141'); // TODO load by config
+        
+        this.data.push(this.orderCode);
+        this.data = this.data.concat(bytesFromNumber(this.rowAddress));
+        this.data = this.data.concat(bytesFromNumber(this.columnAddress));
+        this.data = this.data.concat([...codepage.encode(this.repeatedCharacterOriginal)]);
+
+        return x(this.data);
     }
 
     deserialize(data) {
@@ -1186,8 +1286,6 @@ class Tn5250MessageEscapeCommandObjectWriteToDisplayOrderCommandStartOfField ext
         this.nondisplay = false;
         this.fieldLength = 0;
         this.repeatedCharacter = null;
-
-        this.deserialize(data);
     }
 
     deserialize(data) {
